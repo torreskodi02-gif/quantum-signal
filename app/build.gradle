@@ -1,0 +1,21 @@
+plugins { id 'com.android.application'; id 'org.jetbrains.kotlin.android' }
+def vc = System.getenv('VC') ?: '1'
+android {
+    namespace 'app.quantumsignal'
+    compileSdk 34
+    defaultConfig { applicationId 'app.quantumsignal'; minSdk 23; targetSdk 28; versionCode vc.toInteger(); versionName "0.$vc" }
+    signingConfigs {
+        release {
+            def f = System.getenv('KS_FILE')
+            if (f) {
+                storeFile file(f); storePassword System.getenv('KS_PASS')
+                keyAlias 'voltforge'; keyPassword System.getenv('KS_PASS')
+                enableV1Signing = true; enableV2Signing = true; enableV3Signing = true
+            }
+        }
+    }
+    buildTypes { release { minifyEnabled false; signingConfig signingConfigs.release } }
+    compileOptions { sourceCompatibility JavaVersion.VERSION_17; targetCompatibility JavaVersion.VERSION_17 }
+    kotlinOptions { jvmTarget = '17' }
+    lint { abortOnError false; checkReleaseBuilds false }
+}
