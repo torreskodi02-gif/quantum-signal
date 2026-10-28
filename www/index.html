@@ -1,0 +1,236 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Quantum Signal</title>
+<style>
+:root{--bg:#fff;--sf:#f3f5f9;--tx:#14171f;--mu:#667085;--ln:#e4e7ec;--acc:#3a76f0;--in:#e8ebf1;--fs:16px;color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media(prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#0f1116;--sf:#181b22;--tx:#eceef3;--mu:#98a1b0;--ln:#272b34;--in:#242832;color-scheme:dark}}
+:root[data-theme="dark"]{--bg:#0f1116;--sf:#181b22;--tx:#eceef3;--mu:#98a1b0;--ln:#272b34;--in:#242832;color-scheme:dark}
+html,body{height:100%;margin:0}
+body{background:var(--bg);color:var(--tx);font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;-webkit-tap-highlight-color:transparent}
+#app{max-width:520px;margin:0 auto;height:100%;display:flex;flex-direction:column;position:relative}
+button{font:inherit;color:inherit;background:none;border:0;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:4px;padding:8px;border-radius:50%}
+button:focus-visible,input:focus-visible{outline:2px solid var(--acc);outline-offset:2px}
+header{display:flex;align-items:center;gap:6px;padding:8px 10px;flex:none}
+header h1{flex:1;margin:0;font-size:22px;font-weight:700;letter-spacing:-.3px}
+.av{display:flex;align-items:center;justify-content:center;border-radius:50%;color:#fff;font-weight:600;font-style:normal;flex:none}
+.srch{margin:0 14px 6px;padding:11px 16px;border-radius:22px;border:0;background:var(--sf);color:var(--tx);font:inherit;font-size:15px;flex:none}
+#cl,.pg{flex:1;overflow-y:auto}
+.it{display:flex;gap:12px;padding:10px 16px;align-items:center;cursor:pointer}
+.it:active,.row:active{background:var(--sf)}
+.it .m{flex:1;min-width:0}.it b{display:block;font-weight:600}
+.it span,.hint,small{color:var(--mu);font-size:14px}
+.it .m span{display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.it .r{text-align:right;font-size:12px;color:var(--mu);display:flex;flex-direction:column;align-items:flex-end;gap:4px}
+.bd{background:var(--acc);color:#fff;border-radius:10px;padding:1px 7px;font-size:12px;font-weight:600}
+.fab{position:absolute;right:18px;bottom:78px;width:56px;height:56px;background:var(--acc);color:#fff;box-shadow:0 4px 14px #0004}
+nav{display:flex;border-top:1px solid var(--ln);flex:none}
+nav button{flex:1;flex-direction:column;border-radius:0;font-size:12px;color:var(--mu);padding:8px 0}
+nav button.on{color:var(--acc);font-weight:600}
+.hint{padding:12px 16px;line-height:1.4}
+.ch{border-bottom:1px solid var(--ln)}
+.who{flex:1;display:flex;align-items:center;gap:10px;cursor:pointer;min-width:0}
+.who b{display:block;font-size:16px}
+#msgs{flex:1;overflow-y:auto;padding:12px 12px 18px;display:flex;flex-direction:column;gap:5px;background:var(--bg)}
+.b{max-width:78%;padding:8px 12px;border-radius:18px;font-size:var(--fs);line-height:1.35;position:relative;word-wrap:break-word;margin-bottom:2px}
+.out{align-self:flex-end;background:var(--acc);color:#fff;border-bottom-right-radius:6px}
+.in{align-self:flex-start;background:var(--in);border-bottom-left-radius:6px}
+.b small{display:block;font-size:11px;opacity:.75;text-align:right;margin-top:2px;color:inherit}
+.b em{position:absolute;bottom:-11px;right:10px;background:var(--bg);border:1px solid var(--ln);border-radius:10px;font-style:normal;font-size:12px;padding:0 5px;color:var(--tx)}
+.q{border-left:3px solid currentColor;opacity:.8;padding:2px 8px;margin-bottom:4px;font-size:13px}
+.typ{display:flex;gap:4px;padding:14px}.typ s{width:7px;height:7px;border-radius:50%;background:var(--mu);animation:bl 1s infinite}.typ s:nth-child(2){animation-delay:.2s}.typ s:nth-child(3){animation-delay:.4s}
+@keyframes bl{50%{opacity:.25}}
+.rp{display:flex;align-items:center;margin:0 12px;padding:6px 10px;background:var(--sf);border-left:3px solid var(--acc);border-radius:8px;font-size:13px}.rp span{flex:1;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
+.bar{display:flex;align-items:center;gap:6px;padding:8px 10px;flex:none}
+.bar input{flex:1;border:0;background:var(--sf);color:var(--tx);border-radius:22px;padding:11px 16px;font:inherit;font-size:16px;min-width:0}
+.snd{background:var(--acc);color:#fff;width:42px;height:42px}
+.row{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:12px 16px;cursor:pointer}
+.row b{display:block;font-weight:500;font-size:16px}
+.grp h3{margin:16px 16px 4px;font-size:14px;color:var(--acc);font-weight:600}
+.sw{width:44px;height:26px;border-radius:13px;background:var(--ln);position:relative;flex:none;transition:background .2s}
+.sw:after{content:"";position:absolute;top:3px;left:3px;width:20px;height:20px;border-radius:50%;background:#fff;transition:left .2s}
+.sw.on{background:var(--acc)}.sw.on:after{left:21px}
+.sw2{display:flex;gap:10px;padding:6px 16px 12px}.sw2 i{width:34px;height:34px;border-radius:50%;cursor:pointer;border:3px solid var(--bg);box-shadow:0 0 0 2px var(--ln)}.sw2 i.on{box-shadow:0 0 0 2px var(--tx)}
+.prof{display:flex;gap:14px;align-items:center;padding:14px 16px}
+.dng b{color:#d92d20!important}
+.lock{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;padding:20px;text-align:center}
+.logo{width:72px;height:72px;border-radius:22px;background:linear-gradient(145deg,var(--acc),#6d4df2);color:#fff;display:flex;align-items:center;justify-content:center;margin-bottom:8px}
+.lock h2{margin:0;font-size:22px}.lock p{margin:0 0 10px;color:var(--mu);font-size:14px;min-height:20px}
+.dots{display:flex;gap:16px;margin:10px 0 18px}.dots i{width:14px;height:14px;border-radius:50%;border:2px solid var(--mu)}.dots i.f{background:var(--acc);border-color:var(--acc)}
+.pad{display:grid;grid-template-columns:repeat(3,76px);gap:12px}
+.pad button{height:68px;border-radius:50%;background:var(--sf);font-size:26px;font-weight:500}.pad button:disabled{opacity:.3}
+.sh{position:fixed;inset:0;background:#0007;display:flex;align-items:flex-end;z-index:20}
+.bx{width:100%;max-width:520px;margin:0 auto;background:var(--bg);border-radius:20px 20px 0 0;padding:12px 8px calc(12px + env(safe-area-inset-bottom,0px));max-height:80%;overflow:auto}
+.bx h4{margin:4px 16px 8px;font-size:17px}
+.bx button{display:block;width:100%;text-align:left;padding:14px 16px;font-size:16px;border-radius:10px}.bx button:active{background:var(--sf)}
+.sn{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;padding:8px 16px;font:600 15px ui-monospace,Menlo,monospace;text-align:center}
+.toast{position:fixed;left:50%;bottom:90px;transform:translateX(-50%);background:var(--tx);color:var(--bg);padding:10px 18px;border-radius:20px;font-size:14px;z-index:30;animation:tf 2.4s forwards;max-width:86%;text-align:center}
+@keyframes tf{0%,80%{opacity:1}100%{opacity:0}}
+body.priv::after{content:"Quantum Signal";position:fixed;inset:0;background:var(--bg);display:flex;align-items:center;justify-content:center;z-index:99;font-size:22px;font-weight:700}
+@media(prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+.b{border-radius:var(--rad,18px)}.out{border-bottom-right-radius:6px}.in{border-bottom-left-radius:6px}#msgs{background:var(--wall,var(--bg))}
+.out{background:var(--bo,var(--acc))}
+:root[data-inc="tint"] .in{background:color-mix(in srgb,var(--acc) 16%,var(--bg))}
+.b{border-radius:var(--rad,18px);margin:0;padding:7px 12px 6px;line-height:1.3;overflow-wrap:anywhere}
+.b::after{content:"";display:block;clear:both}
+.tx{white-space:pre-wrap}
+.mt{float:right;display:inline-flex;align-items:center;gap:3px;font-size:11px;opacity:.85;margin:5px 0 -3px 12px;user-select:none}
+.in .mt{color:var(--mu);opacity:1}
+.out.gp{border-top-right-radius:4px}.out.gn{border-bottom-right-radius:4px}.in.gp{border-top-left-radius:4px}.in.gn{border-bottom-left-radius:4px}
+.b.gn{margin-bottom:-3px}
+.day{align-self:center;font-size:12px;color:var(--mu);background:var(--sf);padding:3px 10px;border-radius:10px;margin:8px 0}
+.upc{display:flex;align-items:center;justify-content:space-between;gap:12px;margin:10px 16px 4px;padding:14px 16px;border-radius:16px;background:var(--sf);border:1px solid var(--ln)}
+.upc b{display:block;font-size:16px}
+.upc button{background:var(--acc);color:#fff;border-radius:22px;padding:10px 18px;font-weight:600;flex:none}
+.upc.avail{background:var(--acc);color:#fff;border-color:transparent;box-shadow:0 6px 18px #0003}
+.upc.avail small{color:#ffffffd9}
+.upc.avail button{background:#fff;color:var(--acc)}
+.upc.checking button,.upc.applying button{opacity:.55;pointer-events:none}
+</style></head><body><div id="app"></div>
+<script>
+const $=s=>document.querySelector(s),KEY="qs_v1";
+const E=s=>String(s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+const H=s=>{let h=0;for(const c of s)h=(h*31+c.charCodeAt(0))>>>0;return h};
+const COL=["#3a76f0","#e0457b","#2fa36b","#e08a1e","#8a5cf6","#0e9fb5"];
+const P={back:'<path d="M15 5l-7 7 7 7"/>',search:'<circle cx="11" cy="11" r="6"/><path d="M16 16l5 5"/>',send:'<path d="M4 12l16-8-6 16-3-6z"/>',more:'<circle cx="12" cy="5" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="12" cy="19" r="1"/>',phone:'<path d="M5 4h4l2 5-2 1a11 11 0 005 5l1-2 5 2v4a2 2 0 01-2 2A16 16 0 013 6a2 2 0 012-2z"/>',edit:'<path d="M4 20h4L19 9l-4-4L4 16z"/>',clip:'<path d="M20 11l-8 8a5 5 0 01-7-7l8-8a3 3 0 014 4l-8 8a1 1 0 01-2-2l7-7"/>',fp:'<path d="M12 3a8 8 0 00-8 8v2M12 7a4 4 0 00-4 4v3a6 6 0 01-1 3M12 11v4a8 8 0 01-2 5M16 11a4 4 0 00-1-3M20 13v-2a8 8 0 00-3-6M16 15a14 14 0 01-1 4"/>',lock:'<rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 018 0v3"/>',x:'<path d="M6 6l12 12M18 6L6 18"/>',msg:'<path d="M4 5h16v11H9l-5 4z"/>',gear:'<circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M5 5l2 2M17 17l2 2M19 5l-2 2M7 17l-2 2"/>'};
+const ic=(n,s=22)=>`<svg width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${P[n]}</svg>`;
+const av=(n,z=44)=>`<i class="av" style="width:${z}px;height:${z}px;background:${COL[H(n)%6]};font-size:${z*.42}px">${E(n[0])}</i>`;
+const DL={0:"Off",10:"10 seconds",60:"1 minute",3600:"1 hour",86400:"1 day"};
+const PK={autolock:{t:"Auto-lock",o:[[0,"Immediately"],[30,"After 30 seconds"],[60,"After 1 minute"],[300,"After 5 minutes"]]},disap:{t:"Default disappearing timer",o:Object.entries(DL).map(([k,v])=>[+k,v])},theme:{t:"Theme",o:[["system","System"],["light","Light"],["dark","Dark"]]},font:{t:"Message size",o:[[14,"Small"],[16,"Medium"],[19,"Large"]]}};
+const ACC=["#3a76f0","#6d4df2","#e0457b","#2fa36b","#e08a1e","#0e9fb5"];
+const fmt=t=>new Date(t).toLocaleTimeString([],{hour:"numeric",minute:"2-digit"});
+const fday=t=>new Date(t).toDateString()===new Date().toDateString()?fmt(t):new Date(t).toLocaleDateString([],{weekday:"short"});
+function seed(){return{mig:3,cfg:{pin:null,bio:true,autolock:30,screenSec:true,receipts:true,incog:true,wipe10:false,theme:"system",acc:"#3a76f0",font:16,disap:0,cred:null,skin:"signal",bshape:"signal",bcol:"",inc:"plain",ts:"group"},chats:[{id:"Note to Self",name:"Note to Self",msgs:[],dis:0,ver:false,unread:0}]}}
+let S,view="list",tab="chats",cur=null,q="",reply=null,locked=true,pin="",stage=0,first="",tries=0,until=0,hid=0;
+const C=()=>S.cfg,chat=()=>S.chats.find(c=>c.id===cur),last=c=>c.msgs.length?c.msgs[c.msgs.length-1].ts:0;
+function save(){try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){}}
+function load(){try{S=JSON.parse(localStorage.getItem(KEY))}catch(e){S=null}if(!S||!S.cfg)S=seed();S.cfg=Object.assign({bshape:"signal",bcol:"",inc:"plain",ts:"group",skin:"signal"},S.cfg);if(S.mig!==3){S.chats=S.chats.filter(c=>c.pub||c.id==="Note to Self");const n=S.chats.find(c=>c.id==="Note to Self");if(n&&n.msgs.length===1&&n.msgs[0].t.startsWith("Ideas:"))n.msgs=[];S.mig=3;save()}}
+function applyTheme(){const r=document.documentElement;r.dataset.theme=C().theme==="system"?"":C().theme;r.style.setProperty("--acc",C().acc);r.style.setProperty("--fs",C().font+"px");const k=SK[C().skin]||SK.signal;r.style.setProperty("--rad",k.rad+"px");r.style.setProperty("--wall",k.wall||"var(--bg)");k.wall==="#000"?r.style.setProperty("--bg","#000"):r.style.removeProperty("--bg");document.body.style.fontFamily=k.f||"";r.style.setProperty("--bo",C().bcol||"var(--acc)");r.style.setProperty("--rad",({signal:18,soft:24,sharp:6})[C().bshape||"signal"]+"px");r.dataset.inc=C().inc||"plain"}
+function toast(t){const d=document.createElement("div");d.className="toast";d.textContent=t;document.body.append(d);setTimeout(()=>d.remove(),2400)}
+function sheet(t,items,html=""){const d=document.createElement("div");d.className="sh";d.innerHTML=`<div class="bx"><h4>${t}</h4>${html}${items.map((x,i)=>`<button data-i="${i}">${x[0]}</button>`).join("")}</div>`;d.onclick=e=>{const b=e.target.closest("button");if(b){d.remove();items[b.dataset.i][1]()}else if(e.target===d)d.remove()};document.body.append(d)}
+/* Biometrics: native plugin inside the APK, WebAuthn (device fingerprint) on HTTPS web */
+const b64e=b=>btoa(String.fromCharCode(...new Uint8Array(b))),b64d=s=>Uint8Array.from(atob(s),c=>c.charCodeAt(0));
+const Bio={async auth(){const N=window.Capacitor&&Capacitor.Plugins&&Capacitor.Plugins.NativeBiometric;
+if(N){try{await N.verifyIdentity({reason:"Unlock Quantum Signal",title:"Quantum Signal"});return true}catch(e){return false}}
+try{if(!window.PublicKeyCredential||!(await PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable()))return false;
+const ch=crypto.getRandomValues(new Uint8Array(32));
+if(C().cred){await navigator.credentials.get({publicKey:{challenge:ch,allowCredentials:[{id:b64d(C().cred),type:"public-key"}],userVerification:"required",timeout:60000}});return true}
+const c=await navigator.credentials.create({publicKey:{challenge:ch,rp:{name:"Quantum Signal"},user:{id:ch.slice(0,16),name:"me",displayName:"Me"},pubKeyCredParams:[{type:"public-key",alg:-7},{type:"public-key",alg:-257}],authenticatorSelection:{authenticatorAttachment:"platform",userVerification:"required"},timeout:60000}});
+C().cred=b64e(c.rawId);save();return true}catch(e){return false}}};
+/* Render */
+function render(){const a=$("#app");if(locked)a.innerHTML=lockHTML();else if(view==="chat"){a.innerHTML=chatHTML();renderMsgs()}else a.innerHTML=listHTML()}
+function lockHTML(){const c=C(),mk=!c.pin;return`<div class="lock"><div class="logo">${ic("lock",34)}</div><h2>${mk?(stage?"Confirm your PIN":"Create a 4-digit PIN"):"Unlock Quantum Signal"}</h2><p id="lm">${mk?"Your PIN protects the app on this device":"Enter your PIN or use your fingerprint"}</p><div class="dots">${[0,1,2,3].map(i=>`<i class="${i<pin.length?"f":""}"></i>`).join("")}</div><div class="pad">${[1,2,3,4,5,6,7,8,9].map(n=>`<button data-a="key" data-v="${n}">${n}</button>`).join("")}<button data-a="bio" aria-label="Fingerprint" ${c.bio&&c.pin?"":"disabled"}>${ic("fp",30)}</button><button data-a="key" data-v="0">0</button><button data-a="key" data-v="x" aria-label="Delete">⌫</button></div></div>`}
+function rows(){const l=S.chats.filter(c=>c.name.toLowerCase().includes(q.toLowerCase())).sort((a,b)=>last(b)-last(a));return l.map(c=>{const m=c.msgs[c.msgs.length-1];return`<div class="it" data-a="open" data-v="${E(c.id)}">${av(c.name,48)}<div class="m"><b>${E(c.name)}${c.ver?" ✓":""}</b><span>${m?(m.me?"You: ":"")+E(m.t):"No messages yet"}</span></div><div class="r">${m?fday(m.ts):""}${c.dis?"⏱":""}${c.unread?`<i class="bd">${c.unread}</i>`:""}</div></div>`}).join("")+(S.chats.length<2&&!q?'<p class="hint">Tap the pencil to find someone by username and start an encrypted chat.</p>':"")||'<p class="hint">No chats found.</p>'}
+function listHTML(){const T={chats:"Quantum Signal",calls:"Calls",set:"Settings"};
+const nav=[["chats","Chats","msg"],["set","Settings","gear"]].map(t=>`<button data-a="tab" data-v="${t[0]}" class="${tab===t[0]?"on":""}">${ic(t[2])}<span>${t[1]}${t[0]==="set"&&UP.s==="avail"?'<b style="color:#e5484d"> ●</b>':""}</span></button>`).join("");
+let b="";if(tab==="chats")b=`<input id="sq" class="srch" placeholder="Search" value="${E(q)}" autocomplete="off"><div id="cl">${rows()}</div><button class="fab" data-a="newchat" aria-label="New message">${ic("edit",24)}</button>`;
+else b=setHTML();
+return`<header>${tab==="chats"?`<button data-a="tab" data-v="set" aria-label="Profile">${av("You",34)}</button>`:""}<h1>${T[tab]}</h1>${tab==="chats"?`<button data-a="lock" aria-label="Lock now">${ic("lock")}</button>`:""}</header>${b}<nav>${nav}</nav>`}
+function setHTML(){const c=C();
+const tg=(k,t,d)=>`<div class="row" data-a="tg" data-v="${k}"><div><b>${t}</b><small>${d}</small></div><i class="sw ${c[k]?"on":""}"></i></div>`;
+const pk=(k,t)=>`<div class="row" data-a="pick" data-v="${k}"><div><b>${t}</b></div><small>${PK[k].o.find(x=>x[0]==c[k])[1]}</small></div>`;
+const act=(a,t,d,x="")=>`<div class="row ${x}" data-a="${a}"><div><b>${t}</b><small>${d}</small></div></div>`;
+return`<div class="pg">${upCard()}<div class="prof">${av(c.user||"You",56)}<div><b style="font-size:18px">${c.user?"@"+E(c.user):"You"}</b><small>${c.token?"End-to-end encrypted":"Not connected to a server yet"}</small></div></div>
+<div class="grp"><h3>Privacy and security</h3>${tg("bio","Fingerprint unlock","Use your device’s fingerprint sensor to open the app")}${pk("autolock","Auto-lock")}${tg("screenSec","Screen security","Hide the app in recent apps and block previews")}${tg("incog","Incognito keyboard","Ask the keyboard not to learn what you type")}${tg("receipts","Read receipts","Let people see when you read their messages")}${tg("wipe10","Wipe after 10 wrong PINs","Erase all data on this device")}${pk("disap","Default disappearing timer")}</div>
+<div class="grp"><h3>Appearance</h3><div class="row" data-a="skins"><div><b>Style</b></div><small>${(SK[c.skin]||SK.signal).n}</small></div>${pk("theme","Theme")}${pk("font","Message size")}<div class="sw2">${ACC.map(a=>`<i data-a="acc" data-v="${a}" class="${c.acc===a?"on":""}" style="background:${a}"></i>`).join("")}</div></div>
+<div class="grp"><h3>Chat bubbles</h3>${pk("bshape","Bubble shape")}${pk("inc","Incoming bubbles")}${pk("ts","Timestamps")}<div class="row" style="cursor:default"><div><b>Sent bubble colour</b></div></div><div class="sw2">${BC.map(x=>`<i data-a="bcol" data-v="${x}" class="${(c.bcol||"")===x?"on":""}" style="background:${x||c.acc}"></i>`).join("")}</div></div>
+<div class="grp"><h3>Network and updates</h3>${act("server","Server address",(c.server||"Not set")+(c.token&&online===false?" · offline":""))}${act("claim","Username",c.user?"@"+c.user:"Tap to choose")}</div>
+<div class="grp"><h3>Account</h3>${act("fp","Test fingerprint","Check that your fingerprint sensor works")}${act("pin","Change PIN","Set a new 4-digit PIN")}${act("lock","Lock now","Require PIN or fingerprint to reopen")}${act("panic","Panic wipe","Erase every chat, setting and PIN","dng")}</div><p class="hint">Quantum Signal v${VER}</p></div>`}
+function chatHTML(){const c=chat();return`<header class="ch"><button data-a="back" aria-label="Back">${ic("back")}</button><div class="who" data-a="info">${av(c.name,38)}<div><b>${E(c.name)}</b><small>${c.ver?"✓ Verified · ":""}${c.dis?"⏱ "+DL[c.dis]:"🔒 End-to-end encrypted"}</small></div></div><button data-a="cmenu" aria-label="More">${ic("more")}</button></header><div id="msgs"></div><div id="rp"></div><div class="bar"><input id="inp" placeholder="Message" autocomplete="off" ${C().incog?'autocorrect="off" spellcheck="false" autocapitalize="sentences"':""}><button class="snd" data-a="send" aria-label="Send">${ic("send")}</button></div>`}
+function renderMsgs(){const el=$("#msgs");if(!el||view!=="chat")return;const M=chat().msgs,mode=C().ts||"group";let h="",pd="";
+M.forEach((m,i)=>{const p=M[i-1],n=M[i+1],d=new Date(m.ts).toDateString();if(d!==pd){h+=`<div class="day">${dayLbl(m.ts)}</div>`;pd=d}
+const gp=p&&p.me===m.me&&m.ts-p.ts<18e4&&new Date(p.ts).toDateString()===d,gn=n&&n.me===m.me&&n.ts-m.ts<18e4&&new Date(n.ts).toDateString()===d,st=m.me?(m.st??1):0,sT=mode==="all"||(mode==="group"&&!gn);
+h+=`<div class="b ${m.me?"out":"in"}${gp?" gp":""}${gn?" gn":""}${st===-1?" bad":""}" data-a="mm" data-v="${E(m.id)}">${m.q?`<div class="q">${E(m.q)}</div>`:""}<span class="tx">${E(m.t)}</span><span class="mt">${m.exp?"⏱ ":""}${sT?fmt(m.ts):""}${m.me?tick(st):""}</span>${m.r?`<em>${m.r}</em>`:""}</div>`});
+el.innerHTML=h;el.scrollTop=el.scrollHeight}
+function safety(c){let h=H(c.name+"qs"),o=[];for(let i=0;i<12;i++){h=(h*1103515245+12345)>>>0;o.push(String(h%100000).padStart(5,"0"))}return o}
+function send(){const i=$("#inp"),t=i.value.trim();if(!t)return;const c=chat(),m={id:uid(),me:1,t,ts:Date.now(),r:null,q:reply,st:c.pub?0:1,exp:c.dis?Date.now()+c.dis*1000:0};c.msgs.push(m);reply=null;i.value="";$("#rp").innerHTML="";save();renderMsgs();if(c.pub)relay(c,m)}
+function msg(t){const m=$("#lm");if(m)m.textContent=t}
+function unlock(){locked=false;view="list";render()}
+function wipe(){try{localStorage.removeItem(KEY)}catch(e){}S=seed();applyTheme();locked=true;pin="";stage=0;view="list";tab="chats";render()}
+const A={
+tab(v){tab=v;render()},
+open(v){cur=v;view="chat";chat().unread=0;save();render();markRead(chat())},
+back(){view="list";cur=null;render()},
+send,
+lock(){locked=true;pin="";render()},
+key(v){if(Date.now()<until)return msg("Too many attempts. Wait 30 seconds.");
+if(v==="x")pin=pin.slice(0,-1);else if(pin.length<4)pin+=v;
+if(pin.length<4)return render();const c=C();
+if(!c.pin){if(!stage){first=pin;pin="";stage=1;return render()}
+if(pin===first){c.pin=pin;save();pin="";stage=0;return unlock()}pin="";stage=0;first="";render();return msg("PINs did not match. Try again.")}
+if(pin===c.pin){tries=0;pin="";return unlock()}
+tries++;pin="";if(tries>=10&&c.wipe10)return wipe();if(tries>=5)until=Date.now()+3e4;render();msg("Wrong PIN")},
+async bio(){if(await Bio.auth())unlock();else msg("Fingerprint unavailable here. Use your PIN.")},
+newchat(){const pool=["Sam Okafor","Priya Nair","Leo Martin","Hana Sato"].filter(n=>!S.chats.some(c=>c.name===n));sheet("New message",pool.map(n=>[n,()=>{S.chats.push({id:n,name:n,msgs:[],dis:C().disap,ver:false,unread:0});save();A.open(n)}]),pool.length?"":'<p class="hint">Everyone is already in your chats.</p>')},
+mm(v){const c=chat(),m=c.msgs.find(x=>x.id==v);if(!m)return;sheet("Message",[["Reply",()=>{reply=m.t;$("#rp").innerHTML=`<div class="rp"><span>${E(m.t)}</span><button data-a="xr" aria-label="Cancel reply">${ic("x",16)}</button></div>`;$("#inp").focus()}],...["❤️","👍","😂"].map(r=>["React "+r,()=>{m.r=m.r===r?null:r;save();renderMsgs();if(c.pub)tx(c,{k:"x",id:m.id,r:m.r}).catch(()=>{})}]),["Copy",()=>{try{navigator.clipboard.writeText(m.t)}catch(e){}toast("Copied")}],["Delete for me",()=>{c.msgs=c.msgs.filter(x=>x!==m);save();renderMsgs()}]])},
+xr(){reply=null;$("#rp").innerHTML=""},
+cmenu(){const c=chat();sheet(E(c.name),[["Disappearing messages · "+DL[c.dis],()=>A.dis()],["View safety number",()=>A.info()],["Clear chat",()=>{c.msgs=[];save();renderMsgs()}],["Delete chat",()=>{S.chats=S.chats.filter(x=>x!==c);save();A.back()}]])},
+dis(){const c=chat();sheet("Disappearing messages",Object.entries(DL).map(([k,v])=>[v,()=>{c.dis=+k;save();render();toast("Timer: "+v)}]))},
+info(){const c=chat();sheet("Safety number",[[c.ver?"Mark as unverified":"Mark as verified",()=>{c.ver=!c.ver;save();render()}]],`<div class="sn">${safety(c).map(x=>`<span>${x}</span>`).join("")}</div><p class="hint">Compare these numbers with ${E(c.name)} in person to confirm no one is intercepting your chat.</p>`)},
+
+
+async tg(k){const c=C();if(k==="bio"&&!c.bio&&!(await Bio.auth()))return toast("Fingerprint is not available on this device or connection");c[k]=!c[k];save();render()},
+pick(k){const p=PK[k];sheet(p.t,p.o.map(([v,l])=>[l,()=>{C()[k]=v;save();applyTheme();render()}]))},
+acc(v){C().acc=v;save();applyTheme();render()},
+async fp(){toast(await Bio.auth()?"Fingerprint verified ✓":"Fingerprint check failed")},
+pin(){C().pin=null;save();locked=true;pin="";stage=0;render()},
+panic(){sheet("Wipe all data?",[["Yes, wipe everything now",wipe]],'<p class="hint">Deletes every chat, setting and your PIN from this device.</p>')}};
+document.addEventListener("click",e=>{const el=e.target.closest("[data-a]");if(el&&A[el.dataset.a])A[el.dataset.a](el.dataset.v)});
+document.addEventListener("input",e=>{if(e.target.id==="sq"){q=e.target.value;$("#cl").innerHTML=rows()}});
+document.addEventListener("keydown",e=>{if(e.key==="Enter"&&e.target.id==="inp")send()});
+document.addEventListener("visibilitychange",()=>{if(document.hidden){hid=Date.now();if(C().screenSec)document.body.classList.add("priv")}else{document.body.classList.remove("priv");if(!locked&&C().pin&&(Date.now()-hid)/1000>=C().autolock){locked=true;pin="";render()}}});
+setInterval(()=>{const n=Date.now();let ch=0;S.chats.forEach(c=>{const k=c.msgs.length;c.msgs=c.msgs.filter(m=>!m.exp||m.exp>n);if(c.msgs.length!==k)ch=1});if(ch&&!locked){save();view==="chat"?renderMsgs():render()}},1000);
+const VER="0.3.1";
+const SK={signal:{n:"Signal",acc:"#3a76f0",rad:18,wall:"",f:""},ios:{n:"iOS",acc:"#0a84ff",rad:20,wall:"",f:"-apple-system,BlinkMacSystemFont,'SF Pro Text',system-ui,sans-serif"},midnight:{n:"Midnight (OLED)",acc:"#8b5cf6",rad:16,wall:"#000",f:"",dark:1},aurora:{n:"Aurora",acc:"#14b8a6",rad:22,wall:"linear-gradient(160deg,#0f2027,#203a43,#2c5364)",f:"",dark:1},sunset:{n:"Sunset",acc:"#f97316",rad:20,wall:"linear-gradient(160deg,#fff1e6,#ffe0f0)",f:"",light:1}};
+/* End-to-end encryption: ECDH P-256 key agreement + AES-GCM. Server only ever sees ciphertext. */
+const Net={
+async j(p,o={}){const a=new AbortController(),tm=setTimeout(()=>a.abort(),1e4);try{const r=await fetch((C().server||"").replace(/\/$/,"")+p,{...o,signal:a.signal,headers:{"content-type":"application/json","x-token":C().token||""}});const d=await r.json().catch(()=>({}));if(!r.ok)throw new Error(d.e||("error "+r.status));return d}finally{clearTimeout(tm)}},
+key:(j,priv)=>crypto.subtle.importKey("jwk",j,{name:"ECDH",namedCurve:"P-256"},false,priv?["deriveKey"]:[]),
+async shared(pub){return crypto.subtle.deriveKey({name:"ECDH",public:await Net.key(pub)},await Net.key(C().priv,1),{name:"AES-GCM",length:256},false,["encrypt","decrypt"])},
+async reg(u){const k=await crypto.subtle.generateKey({name:"ECDH",namedCurve:"P-256"},true,["deriveKey"]);const pub=await crypto.subtle.exportKey("jwk",k.publicKey),priv=await crypto.subtle.exportKey("jwk",k.privateKey);const d=await Net.j("/register",{method:"POST",body:JSON.stringify({u,pub})});Object.assign(C(),{user:u,token:d.token,pub,priv});save()},
+async find(u){return(await Net.j("/user/"+encodeURIComponent(u))).pub},
+async enc(pub,t){const iv=crypto.getRandomValues(new Uint8Array(12));return{iv:b64e(iv),ct:b64e(await crypto.subtle.encrypt({name:"AES-GCM",iv},await Net.shared(pub),new TextEncoder().encode(t)))}},
+async dec(pub,m){return new TextDecoder().decode(await crypto.subtle.decrypt({name:"AES-GCM",iv:b64d(m.iv)},await Net.shared(pub),b64d(m.ct)))}};
+Net.msg=e=>e.name==="AbortError"?"the server timed out":e instanceof TypeError?"can’t reach the server":e.message;
+Object.assign(PK,{bshape:{t:"Bubble shape",o:[["signal","Signal (rounded, grouped)"],["soft","Extra round"],["sharp","Square"]]},inc:{t:"Incoming bubbles",o:[["plain","Standard"],["tint","Tinted to match"]]},ts:{t:"Timestamps",o:[["all","On every message"],["group","End of each group"],["off","Hidden"]]}});
+const BC=["","#2c6bed","#6d4df2","#d6336c","#1f9d6b","#e8590c","#343a40"];
+const uid=()=>Date.now().toString(36)+Math.random().toString(36).slice(2,8),busy=new Set();let online=null;
+const dayLbl=t=>new Date(t).toDateString()===new Date().toDateString()?"Today":new Date(t).toLocaleDateString([],{weekday:"long",month:"short",day:"numeric"});
+const tick=st=>`<svg class="tk" width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">${st===-1?'<circle cx="8" cy="8" r="6.5" stroke="#ff9a9a"/><path d="M8 4.6v4M8 11.2v.1" stroke="#ff9a9a"/>':st===0?'<circle cx="8" cy="8" r="6.5" stroke-dasharray="2 2.4"/>':st===1?'<circle cx="8" cy="8" r="6.5"/><path d="M5 8.2l2 2 3.6-4"/>':st===2?'<circle cx="8" cy="8" r="6.5"/><path d="M3.8 8.2l2 2 3-3.4M7 9.6l.4.4 3.8-4.4"/>':'<circle cx="8" cy="8" r="7" fill="currentColor"/><path d="M3.8 8.2l2 2 3-3.4M7 9.6l.4.4 3.8-4.4" stroke="var(--bo,var(--acc))"/>'}</svg>`;
+async function tx(c,p){const e=await Net.enc(c.pub,JSON.stringify(p));await Net.j("/send",{method:"POST",body:JSON.stringify({from:C().user,to:c.id,...e})})}
+async function relay(c,m){if(busy.has(m.id))return;busy.add(m.id);try{await tx(c,{k:"m",id:m.id,t:m.t,q:m.q||undefined});m.st=Math.max(m.st||0,1)}catch(x){m.st=-1;m.tries=(m.tries||0)+1;if(m.tries===1)toast("Couldn’t send: "+Net.msg(x)+". Retrying…")}busy.delete(m.id);save();renderMsgs()}
+async function markRead(c){if(!c||!c.pub||!C().receipts||document.hidden||locked)return;const ids=c.msgs.filter(m=>!m.me&&!m.rs).map(m=>m.id);if(!ids.length)return;c.msgs.forEach(m=>{if(!m.me)m.rs=1});save();try{await tx(c,{k:"r",ids})}catch(e){c.msgs.forEach(m=>{if(ids.includes(m.id))m.rs=0})}}
+async function poll(){if(!C().token||locked)return;
+S.chats.forEach(c=>c.pub&&c.msgs.forEach(m=>{if(m.me&&m.st===-1&&(m.tries||0)<8)relay(c,m)}));
+try{const d=await Net.j("/inbox?u="+encodeURIComponent(C().user));online=true;const dl={};let bad=0;
+for(const e of d.m){let c=S.chats.find(x=>x.id===e.from);
+if(!c){try{c={id:e.from,name:e.from,msgs:[],dis:C().disap,ver:false,unread:0,pub:await Net.find(e.from)}}catch(x){bad++;continue}S.chats.push(c)}
+let p;try{const raw=await Net.dec(c.pub,e);try{p=JSON.parse(raw)}catch(x){}if(!p||!p.k)p={k:"m",id:uid(),t:raw}}catch(x){bad++;continue}
+if(p.k==="m"){if(!c.msgs.some(x=>x.id===p.id)){c.msgs.push({id:p.id,me:0,t:String(p.t),q:p.q||null,ts:e.ts,r:null,exp:c.dis?Date.now()+c.dis*1000:0});if(!(view==="chat"&&cur===c.id&&!document.hidden))c.unread++}(dl[c.id]=dl[c.id]||{c,ids:[]}).ids.push(p.id)}
+else if(p.k==="d"||p.k==="r"){(p.ids||[]).forEach(id=>{const m=c.msgs.find(x=>x.id===id&&x.me);if(m)m.st=Math.max(m.st??1,p.k==="d"?2:3)})}
+else if(p.k==="x"){const m=c.msgs.find(x=>x.id===p.id);if(m)m.r=p.r||null}}
+if(d.m.length){save();if(view==="chat")renderMsgs();else if(tab==="chats"&&document.activeElement.id!=="sq")render()}
+if(bad)toast(bad+" message"+(bad>1?"s":"")+" couldn’t be decrypted");
+for(const k in dl)tx(dl[k].c,{k:"d",ids:dl[k].ids}).catch(()=>{});
+if(view==="chat")markRead(chat())}catch(e){online=false}}
+setInterval(poll,2000);
+A.bcol=v=>{C().bcol=v;save();applyTheme();render()};
+function ask(t,ph,cb,extra=[]){window._u="";sheet(t,[["Save",()=>cb(window._u.trim().toLowerCase()===window._u.trim()?window._u.trim():window._u.trim())],...extra],`<div style="padding:4px 16px"><input class="srch" style="margin:0;width:100%;box-sizing:border-box" placeholder="${ph}" autocapitalize="none" autocomplete="off" oninput="window._u=this.value"></div>`)}
+Object.assign(A,{
+newchat(){ask("Find by username","username",async v=>{const u=v.toLowerCase();if(!C().token)return toast("Choose a username in Settings first");if(u===C().user)return toast("That’s your own username");try{const pub=await Net.find(u);if(!S.chats.some(c=>c.id===u))S.chats.push({id:u,name:u,msgs:[],dis:C().disap,ver:false,unread:0,pub});save();A.open(u)}catch(e){toast(e.message==="not found"?"No user “"+u+"” found":"Couldn’t search: "+Net.msg(e))}})},
+server(){ask("Server address","http://YOUR_IP:3000",v=>{C().server=v&&!/^https?:\/\//.test(v)?"http://"+v:v;save();render()})},
+claim(){ask("Choose a username","3–20 letters, numbers or _",async v=>{if(!C().server)return toast("Set the server address first");try{await Net.reg(v.toLowerCase());toast("You are @"+v.toLowerCase());render()}catch(e){toast(e.message==="taken"?"That username is taken":"Could not register: "+Net.msg(e))}})},
+skins(){sheet("Style",Object.entries(SK).map(([k,x])=>[x.n,()=>{C().skin=k;C().acc=x.acc;C().theme=x.dark?"dark":x.light?"light":"system";save();applyTheme();render()}]))},
+async upd(s){try{const d=await(await fetch("version.json?"+Date.now(),{cache:"no-store"})).json();if(d.version===VER){if(!s)toast("You’re up to date (v"+VER+")");return}
+sheet("Update available · v"+d.version,[["Update now",async()=>{try{for(const k of await caches.keys())await caches.delete(k)}catch(e){}location.replace(location.pathname+"?v="+d.version)}]],`<p class="hint">${E(d.notes||"")}</p>`)}catch(e){if(!s)toast("In-app updates work in the hosted app")}}});
+let UP={s:"idle",v:"",notes:""};
+const rs=()=>{if(!locked&&view==="list"&&tab==="set")render()};
+const upCard=()=>{const a=UP.s;return`<div class="upc ${a}"><div><b>${a==="avail"?"Update available · v"+E(UP.v):a==="checking"?"Checking for updates…":a==="applying"?"Installing update…":a==="latest"?"You’re up to date":a==="error"?"Couldn’t check for updates":"Quantum Signal v"+VER}</b><small>${a==="avail"?E(UP.notes||"A new version is ready."):a==="error"?"Updates work in the installed or hosted app.":"Version "+VER}</small></div><button data-a="updgo">${a==="avail"?"Update now":a==="checking"?"Checking…":a==="applying"?"Updating…":"Check again"}</button></div>`};
+async function chkUp(){if(UP.s==="checking"||UP.s==="applying")return;const was=UP.s;UP.s="checking";rs();
+try{const d=await(await fetch("version.json?"+Date.now(),{cache:"no-store"})).json();if(!d.version)throw 0;
+if(d.version===VER)UP.s="latest";else{UP={s:"avail",v:String(d.version),notes:d.notes||""};if(was!=="avail")toast("Update available: v"+UP.v)}}catch(e){UP.s="error"}rs();if(!locked&&view==="list"&&tab==="chats")render()}
+async function applyUp(){UP.s="applying";rs();toast("Downloading update…");try{for(const k of await caches.keys())await caches.delete(k)}catch(e){}location.replace(location.pathname+"?v="+UP.v+"&t="+Date.now())}
+A.updgo=()=>UP.s==="avail"?applyUp():chkUp();
+A.upd=()=>chkUp();
+const t0=A.tab;A.tab=v=>{t0(v);if(v==="set")chkUp()};
+load();applyTheme();render();if(window.Capacitor&&C().bio&&C().pin)setTimeout(A.bio,400);setTimeout(()=>A.upd(1),3000);
+</script></body></html>

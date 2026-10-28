@@ -1,2 +1,3 @@
-# Quantum Signal (project two)
-Website: docs/index.html (GitHub Pages). App: app/. Build: .github/workflows/build.yml
+# Quantum Signal
+Private messenger UI. Web app in `www/`, packaged as an Android APK with Capacitor.
+Every push builds the APK through GitHub Actions (artifact: quantum-signal-apk).
