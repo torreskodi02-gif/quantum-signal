@@ -1,0 +1,7 @@
+{
+  "appId": "app.quantumsignal",
+  "appName": "Quantum Signal",
+  "webDir": "www",
+  "server": { "url": "https://torreskodi02-gif.github.io/quantum-signal/", "cleartext": true },
+  "android": { "allowMixedContent": true }
+}
