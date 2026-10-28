@@ -179,7 +179,7 @@ document.addEventListener("input",e=>{if(e.target.id==="sq"){q=e.target.value;$(
 document.addEventListener("keydown",e=>{if(e.key==="Enter"&&e.target.id==="inp")send()});
 document.addEventListener("visibilitychange",()=>{if(document.hidden){hid=Date.now();if(C().screenSec)document.body.classList.add("priv")}else{document.body.classList.remove("priv");if(!locked&&C().pin&&(Date.now()-hid)/1000>=C().autolock){locked=true;pin="";render()}}});
 setInterval(()=>{const n=Date.now();let ch=0;S.chats.forEach(c=>{const k=c.msgs.length;c.msgs=c.msgs.filter(m=>!m.exp||m.exp>n);if(c.msgs.length!==k)ch=1});if(ch&&!locked){save();view==="chat"?renderMsgs():render()}},1000);
-const VER="0.3.1";
+const VER="0.3.2";
 const SK={signal:{n:"Signal",acc:"#3a76f0",rad:18,wall:"",f:""},ios:{n:"iOS",acc:"#0a84ff",rad:20,wall:"",f:"-apple-system,BlinkMacSystemFont,'SF Pro Text',system-ui,sans-serif"},midnight:{n:"Midnight (OLED)",acc:"#8b5cf6",rad:16,wall:"#000",f:"",dark:1},aurora:{n:"Aurora",acc:"#14b8a6",rad:22,wall:"linear-gradient(160deg,#0f2027,#203a43,#2c5364)",f:"",dark:1},sunset:{n:"Sunset",acc:"#f97316",rad:20,wall:"linear-gradient(160deg,#fff1e6,#ffe0f0)",f:"",light:1}};
 /* End-to-end encryption: ECDH P-256 key agreement + AES-GCM. Server only ever sees ciphertext. */
 const Net={
@@ -226,7 +226,7 @@ let UP={s:"idle",v:"",notes:""};
 const rs=()=>{if(!locked&&view==="list"&&tab==="set")render()};
 const upCard=()=>{const a=UP.s;return`<div class="upc ${a}"><div><b>${a==="avail"?"Update available · v"+E(UP.v):a==="checking"?"Checking for updates…":a==="applying"?"Installing update…":a==="latest"?"You’re up to date":a==="error"?"Couldn’t check for updates":"Quantum Signal v"+VER}</b><small>${a==="avail"?E(UP.notes||"A new version is ready."):a==="error"?"Updates work in the installed or hosted app.":"Version "+VER}</small></div><button data-a="updgo">${a==="avail"?"Update now":a==="checking"?"Checking…":a==="applying"?"Updating…":"Check again"}</button></div>`};
 async function chkUp(){if(UP.s==="checking"||UP.s==="applying")return;const was=UP.s;UP.s="checking";rs();
-try{const d=await(await fetch("version.json?"+Date.now(),{cache:"no-store"})).json();if(!d.version)throw 0;
+try{const d=await(await fetch("version.json?"+Date.now(),{cache:"no-store"})).json();if(!d.version)throw 0;if(d.server&&!C().token&&C().server!==d.server){C().server=d.server;save()}
 if(d.version===VER)UP.s="latest";else{UP={s:"avail",v:String(d.version),notes:d.notes||""};if(was!=="avail")toast("Update available: v"+UP.v)}}catch(e){UP.s="error"}rs();if(!locked&&view==="list"&&tab==="chats")render()}
 async function applyUp(){UP.s="applying";rs();toast("Downloading update…");try{for(const k of await caches.keys())await caches.delete(k)}catch(e){}location.replace(location.pathname+"?v="+UP.v+"&t="+Date.now())}
 A.updgo=()=>UP.s==="avail"?applyUp():chkUp();
