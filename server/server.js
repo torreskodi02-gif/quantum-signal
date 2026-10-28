@@ -1,7 +1,9 @@
-// Quantum Signal relay. Run: node server.js   (Node 18+; PORT env var; data in data.json)
+// Quantum Signal relay. Run: node server.js   (Node 18+; env PORT, HOST; data in data.json)
+// HOST=127.0.0.1 -> only this device can reach it. HOST=0.0.0.0 -> anyone on your network.
+// Put quantum-signal.apk next to this file and it is served at /quantum-signal.apk
 // Stores usernames, public keys, hashed tokens and ENCRYPTED messages/receipts only.
-const http=require('http'),fs=require('fs'),crypto=require('crypto');
-const PORT=process.env.PORT||3000,DB='data.json',TTL=7*864e5,BOX_MAX=500;
+const http=require('http'),fs=require('fs'),path=require('path'),crypto=require('crypto');
+const PORT=process.env.PORT||3000,HOST=process.env.HOST||'0.0.0.0',DB='data.json',TTL=7*864e5,BOX_MAX=500;
 let db={users:{},box:{}};
 try{db=JSON.parse(fs.readFileSync(DB))}catch(e){if(e.code!=='ENOENT')console.error('data.json unreadable, starting empty:',e.message)}
 db.users=db.users||{};db.box=db.box||{};
@@ -18,7 +20,7 @@ const str=(v,max)=>typeof v==='string'&&v.length>0&&v.length<=max;
 const hits={},regs={};
 const limited=(map,ip,max,win)=>{const n=Date.now(),h=(map[ip]||[]).filter(t=>n-t<win);h.push(n);map[ip]=h;return h.length>max};
 setInterval(()=>{for(const m of[hits,regs])for(const k in m)if(!m[k].length||Date.now()-m[k][m[k].length-1]>36e5)delete m[k]},6e5);
-const out=(r,c,o)=>{r.writeHead(c,{'content-type':'application/json','access-control-allow-origin':'*','access-control-allow-headers':'content-type,x-token','access-control-allow-methods':'GET,POST,OPTIONS'});r.end(JSON.stringify(o))};
+const out=(r,c,o)=>{r.writeHead(c,{'content-type':'application/json','access-control-allow-origin':'*','access-control-allow-private-network':'true','access-control-allow-headers':'content-type,x-token','access-control-allow-methods':'GET,POST,OPTIONS'});r.end(JSON.stringify(o))};
 const body=req=>new Promise((ok,no)=>{let b='',big=false;
  req.on('data',d=>{if(big)return;b+=d;if(b.length>65536)big=true});
  req.on('end',()=>{if(big)return no(new HttpErr(413,'too large'));try{ok(JSON.parse(b||'{}'))}catch(e){no(new HttpErr(400,'invalid json'))}});
@@ -54,6 +56,7 @@ http.createServer(async(req,res)=>{try{
   if(!auth(u,t))throw new HttpErr(401,'auth');
   const all=(db.box[u]||[]).filter(m=>Date.now()-m.ts<TTL),m=all.slice(0,200);
   db.box[u]=all.slice(200);save();return out(res,200,{m})}
+ if(p==='/quantum-signal.apk'&&req.method==='GET'){const f=path.join(__dirname,'quantum-signal.apk');if(!fs.existsSync(f))throw new HttpErr(404,'not found');res.writeHead(200,{'content-type':'application/vnd.android.package-archive','content-length':fs.statSync(f).size,'content-disposition':'attachment; filename="quantum-signal.apk"'});return fs.createReadStream(f).pipe(res)}
  throw new HttpErr(404,'not found')
 }catch(e){if(!(e instanceof HttpErr))console.error('error:',e.message);if(!res.headersSent)out(res,e.code||500,{e:e instanceof HttpErr?e.message:'server error'})}
-}).listen(PORT,()=>console.log('Quantum Signal server on :'+PORT));
+}).listen(PORT,HOST,()=>console.log('Quantum Signal server on '+HOST+':'+PORT));
