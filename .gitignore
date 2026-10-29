@@ -5,3 +5,5 @@ apk/
 server/server.log
 server/data.json
 server/data.json.tmp
+quantum-signal/
+quantum-signal-apk

@@ -85,6 +85,8 @@ body.priv::after{content:"Quantum Signal";position:fixed;inset:0;background:var(
 .upc.avail small{color:#ffffffd9}
 .upc.avail button{background:#fff;color:var(--acc)}
 .upc.checking button,.upc.applying button{opacity:.55;pointer-events:none}
+.dg{padding:8px 16px}.dg b{display:block;font-weight:600}.dg.ok b{color:#1f9d6b}.dg.warn b{color:#e08a1e}.dg.bad b{color:#d92d20}.dg small{display:block;margin-top:2px;line-height:1.35}
+.rbtn{background:var(--acc);color:#fff;border-radius:22px;padding:12px 24px;font-weight:600;margin-top:10px}
 </style></head><body><div id="app"></div>
 <script>
 const $=s=>document.querySelector(s),KEY="qs_v1";
@@ -103,23 +105,30 @@ function seed(){return{mig:3,cfg:{pin:null,bio:true,autolock:30,screenSec:true,r
 let S,view="list",tab="chats",cur=null,q="",reply=null,locked=true,pin="",stage=0,first="",tries=0,until=0,hid=0;
 const C=()=>S.cfg,chat=()=>S.chats.find(c=>c.id===cur),last=c=>c.msgs.length?c.msgs[c.msgs.length-1].ts:0;
 function save(){try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){}}
-function load(){try{S=JSON.parse(localStorage.getItem(KEY))}catch(e){S=null}if(!S||!S.cfg)S=seed();S.cfg=Object.assign({bshape:"signal",bcol:"",inc:"plain",ts:"group",skin:"signal"},S.cfg);if(S.mig!==3){S.chats=S.chats.filter(c=>c.pub||c.id==="Note to Self");const n=S.chats.find(c=>c.id==="Note to Self");if(n&&n.msgs.length===1&&n.msgs[0].t.startsWith("Ideas:"))n.msgs=[];S.mig=3;save()}}
+function load(){try{S=JSON.parse(localStorage.getItem(KEY))}catch(e){S=null}if(!S||!S.cfg)S=seed();S.cfg=Object.assign({bshape:"signal",bcol:"",inc:"plain",ts:"group",skin:"signal",twofa:false,idle:0,keyAlert:true,hidePrev:false,clipClear:false,keep:0},S.cfg);if(S.mig!==3){S.chats=S.chats.filter(c=>c.pub||c.id==="Note to Self");const n=S.chats.find(c=>c.id==="Note to Self");if(n&&n.msgs.length===1&&n.msgs[0].t.startsWith("Ideas:"))n.msgs=[];S.mig=3;save()}}
 function applyTheme(){const r=document.documentElement;r.dataset.theme=C().theme==="system"?"":C().theme;r.style.setProperty("--acc",C().acc);r.style.setProperty("--fs",C().font+"px");const k=SK[C().skin]||SK.signal;r.style.setProperty("--rad",k.rad+"px");r.style.setProperty("--wall",k.wall||"var(--bg)");k.wall==="#000"?r.style.setProperty("--bg","#000"):r.style.removeProperty("--bg");document.body.style.fontFamily=k.f||"";r.style.setProperty("--bo",C().bcol||"var(--acc)");r.style.setProperty("--rad",({signal:18,soft:24,sharp:6})[C().bshape||"signal"]+"px");r.dataset.inc=C().inc||"plain"}
 function toast(t){const d=document.createElement("div");d.className="toast";d.textContent=t;document.body.append(d);setTimeout(()=>d.remove(),2400)}
 function sheet(t,items,html=""){const d=document.createElement("div");d.className="sh";d.innerHTML=`<div class="bx"><h4>${t}</h4>${html}${items.map((x,i)=>`<button data-i="${i}">${x[0]}</button>`).join("")}</div>`;d.onclick=e=>{const b=e.target.closest("button");if(b){d.remove();items[b.dataset.i][1]()}else if(e.target===d)d.remove()};document.body.append(d)}
 /* Biometrics: native plugin inside the APK, WebAuthn (device fingerprint) on HTTPS web */
 const b64e=b=>btoa(String.fromCharCode(...new Uint8Array(b))),b64d=s=>Uint8Array.from(atob(s),c=>c.charCodeAt(0));
-const Bio={async auth(){const N=window.Capacitor&&Capacitor.Plugins&&Capacitor.Plugins.NativeBiometric;
-if(N){try{await N.verifyIdentity({reason:"Unlock Quantum Signal",title:"Quantum Signal"});return true}catch(e){return false}}
-try{if(!window.PublicKeyCredential||!(await PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable()))return false;
+const Bio={err:"",_n:null,
+native:()=>!!(window.Capacitor&&Capacitor.isNativePlatform&&Capacitor.isNativePlatform()),
+N(){if(!Bio.native())return null;if(!Bio._n){try{Bio._n=Capacitor.Plugins&&Capacitor.Plugins.NativeBiometric||Capacitor.registerPlugin("NativeBiometric")}catch(e){}}return Bio._n},
+say(e){const m=String(e&&e.message||e||"");return/cancel|negative|dismiss|user/i.test(m)?"Cancelled":/lock|too many/i.test(m)?"Too many attempts. Try again later":/enrol|not.?enrolled|none|no.?biometr|not.?available/i.test(m)?"No fingerprint is set up. Add one in your phone’s Settings":m||"Fingerprint failed"},
+async info(){if(Bio.native()){const N=Bio.N();if(!N)return{ok:false,kind:"native",err:"Fingerprint plugin missing from this app build"};try{const r=await N.isAvailable();return{ok:!!r.isAvailable,kind:"native",err:r.isAvailable?"":"No fingerprint sensor or none enrolled"}}catch(e){return{ok:false,kind:"native",err:Bio.say(e)}}}
+try{if(window.PublicKeyCredential&&await PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable())return{ok:true,kind:"web"}}catch(e){}return{ok:false,kind:"web",err:"Browsers can’t reach the fingerprint sensor here. Use the installed app"}},
+async auth(){Bio.err="";
+if(Bio.native()){const N=Bio.N();if(!N){Bio.err="Fingerprint plugin missing from this app build";return false}
+try{await N.verifyIdentity({reason:"Unlock Quantum Signal",title:"Quantum Signal",subtitle:"Scan your fingerprint",negativeButtonText:"Use PIN",useFallback:false,maxAttempts:3});return true}catch(e){Bio.err=Bio.say(e);if(Bio.err!=="Cancelled")logErr("fingerprint",Bio.err);return false}}
+try{if(!window.PublicKeyCredential||!(await PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable())){Bio.err="Browsers can’t reach the fingerprint sensor here. Use the installed app";return false}
 const ch=crypto.getRandomValues(new Uint8Array(32));
 if(C().cred){await navigator.credentials.get({publicKey:{challenge:ch,allowCredentials:[{id:b64d(C().cred),type:"public-key"}],userVerification:"required",timeout:60000}});return true}
 const c=await navigator.credentials.create({publicKey:{challenge:ch,rp:{name:"Quantum Signal"},user:{id:ch.slice(0,16),name:"me",displayName:"Me"},pubKeyCredParams:[{type:"public-key",alg:-7},{type:"public-key",alg:-257}],authenticatorSelection:{authenticatorAttachment:"platform",userVerification:"required"},timeout:60000}});
-C().cred=b64e(c.rawId);save();return true}catch(e){return false}}};
+C().cred=b64e(c.rawId);save();return true}catch(e){Bio.err=Bio.say(e);return false}}};
 /* Render */
-function render(){const a=$("#app");if(locked)a.innerHTML=lockHTML();else if(view==="chat"){a.innerHTML=chatHTML();renderMsgs()}else a.innerHTML=listHTML()}
-function lockHTML(){const c=C(),mk=!c.pin;return`<div class="lock"><div class="logo">${ic("lock",34)}</div><h2>${mk?(stage?"Confirm your PIN":"Create a 4-digit PIN"):"Unlock Quantum Signal"}</h2><p id="lm">${mk?"Your PIN protects the app on this device":"Enter your PIN or use your fingerprint"}</p><div class="dots">${[0,1,2,3].map(i=>`<i class="${i<pin.length?"f":""}"></i>`).join("")}</div><div class="pad">${[1,2,3,4,5,6,7,8,9].map(n=>`<button data-a="key" data-v="${n}">${n}</button>`).join("")}<button data-a="bio" aria-label="Fingerprint" ${c.bio&&c.pin?"":"disabled"}>${ic("fp",30)}</button><button data-a="key" data-v="0">0</button><button data-a="key" data-v="x" aria-label="Delete">⌫</button></div></div>`}
-function rows(){const l=S.chats.filter(c=>c.name.toLowerCase().includes(q.toLowerCase())).sort((a,b)=>last(b)-last(a));return l.map(c=>{const m=c.msgs[c.msgs.length-1];return`<div class="it" data-a="open" data-v="${E(c.id)}">${av(c.name,48)}<div class="m"><b>${E(c.name)}${c.ver?" ✓":""}</b><span>${m?(m.me?"You: ":"")+E(m.t):"No messages yet"}</span></div><div class="r">${m?fday(m.ts):""}${c.dis?"⏱":""}${c.unread?`<i class="bd">${c.unread}</i>`:""}</div></div>`}).join("")+(S.chats.length<2&&!q?'<p class="hint">Tap the pencil to find someone by username and start an encrypted chat.</p>':"")||'<p class="hint">No chats found.</p>'}
+function render(){const a=$("#app");try{if(locked)a.innerHTML=lockHTML();else if(view==="chat"){a.innerHTML=chatHTML();renderMsgs()}else a.innerHTML=listHTML()}catch(e){logErr("render",e);view="list";tab="chats";a.innerHTML='<div class="lock"><div class="logo">!</div><h2>Something went wrong</h2><p>This screen couldn’t be drawn. Tap below to scan and repair.</p><button class="rbtn" data-a="debug">Run repair</button></div>'}}
+function lockHTML(){const c=C(),mk=!c.pin;return`<div class="lock"><div class="logo">${ic("lock",34)}</div><h2>${mk?(stage?"Confirm your PIN":"Create a 4-digit PIN"):"Unlock Quantum Signal"}</h2><p id="lm">${mk?"Your PIN protects the app on this device":(c.twofa&&c.bio?"Enter your PIN, then scan your fingerprint":"Enter your PIN or use your fingerprint")}</p><div class="dots">${[0,1,2,3].map(i=>`<i class="${i<pin.length?"f":""}"></i>`).join("")}</div><div class="pad">${[1,2,3,4,5,6,7,8,9].map(n=>`<button data-a="key" data-v="${n}">${n}</button>`).join("")}<button data-a="bio" aria-label="Fingerprint" ${c.bio&&c.pin&&!c.twofa?"":"disabled"}>${ic("fp",30)}</button><button data-a="key" data-v="0">0</button><button data-a="key" data-v="x" aria-label="Delete">⌫</button></div></div>`}
+function rows(){const l=S.chats.filter(c=>c.name.toLowerCase().includes(q.toLowerCase())).sort((a,b)=>last(b)-last(a));return l.map(c=>{const m=c.msgs[c.msgs.length-1];return`<div class="it" data-a="open" data-v="${E(c.id)}">${av(c.name,48)}<div class="m"><b>${E(c.name)}${c.ver?" ✓":""}</b><span>${m?(C().hidePrev?"Message":(m.me?"You: ":"")+E(m.t)):"No messages yet"}</span></div><div class="r">${m?fday(m.ts):""}${c.dis?"⏱":""}${c.unread?`<i class="bd">${c.unread}</i>`:""}</div></div>`}).join("")+(S.chats.length<2&&!q?'<p class="hint">Tap the pencil to find someone by username and start an encrypted chat.</p>':"")||'<p class="hint">No chats found.</p>'}
 function listHTML(){const T={chats:"Quantum Signal",calls:"Calls",set:"Settings"};
 const nav=[["chats","Chats","msg"],["set","Settings","gear"]].map(t=>`<button data-a="tab" data-v="${t[0]}" class="${tab===t[0]?"on":""}">${ic(t[2])}<span>${t[1]}${t[0]==="set"&&UP.s==="avail"?'<b style="color:#e5484d"> ●</b>':""}</span></button>`).join("");
 let b="";if(tab==="chats")b=`<input id="sq" class="srch" placeholder="Search" value="${E(q)}" autocomplete="off"><div id="cl">${rows()}</div><button class="fab" data-a="newchat" aria-label="New message">${ic("edit",24)}</button>`;
@@ -127,28 +136,29 @@ else b=setHTML();
 return`<header>${tab==="chats"?`<button data-a="tab" data-v="set" aria-label="Profile">${av("You",34)}</button>`:""}<h1>${T[tab]}</h1>${tab==="chats"?`<button data-a="lock" aria-label="Lock now">${ic("lock")}</button>`:""}</header>${b}<nav>${nav}</nav>`}
 function setHTML(){const c=C();
 const tg=(k,t,d)=>`<div class="row" data-a="tg" data-v="${k}"><div><b>${t}</b><small>${d}</small></div><i class="sw ${c[k]?"on":""}"></i></div>`;
-const pk=(k,t)=>`<div class="row" data-a="pick" data-v="${k}"><div><b>${t}</b></div><small>${PK[k].o.find(x=>x[0]==c[k])[1]}</small></div>`;
+const pk=(k,t)=>`<div class="row" data-a="pick" data-v="${k}"><div><b>${t}</b></div><small>${(PK[k].o.find(x=>x[0]==c[k])||[0,"Default"])[1]}</small></div>`;
 const act=(a,t,d,x="")=>`<div class="row ${x}" data-a="${a}"><div><b>${t}</b><small>${d}</small></div></div>`;
-return`<div class="pg">${upCard()}<div class="prof">${av(c.user||"You",56)}<div><b style="font-size:18px">${c.user?"@"+E(c.user):"You"}</b><small>${c.token?"End-to-end encrypted":"Not connected to a server yet"}</small></div></div>
+return`<div class="pg">${upCard()}<div class="grp"><h3>Troubleshooting</h3>${act("debug","Check for errors","Scan the app, fix what it can, and show a report")}</div><div class="prof">${av(c.user||"You",56)}<div><b style="font-size:18px">${c.user?"@"+E(c.user):"You"}</b><small>${c.token?"End-to-end encrypted":"Not connected to a server yet"}</small></div></div>
 <div class="grp"><h3>Privacy and security</h3>${tg("bio","Fingerprint unlock","Use your device’s fingerprint sensor to open the app")}${pk("autolock","Auto-lock")}${tg("screenSec","Screen security","Hide the app in recent apps and block previews")}${tg("incog","Incognito keyboard","Ask the keyboard not to learn what you type")}${tg("receipts","Read receipts","Let people see when you read their messages")}${tg("wipe10","Wipe after 10 wrong PINs","Erase all data on this device")}${pk("disap","Default disappearing timer")}</div>
 <div class="grp"><h3>Appearance</h3><div class="row" data-a="skins"><div><b>Style</b></div><small>${(SK[c.skin]||SK.signal).n}</small></div>${pk("theme","Theme")}${pk("font","Message size")}<div class="sw2">${ACC.map(a=>`<i data-a="acc" data-v="${a}" class="${c.acc===a?"on":""}" style="background:${a}"></i>`).join("")}</div></div>
+<div class="grp"><h3>Advanced security</h3>${tg("twofa","Fingerprint + PIN","Require both to unlock")}${pk("idle","Lock when idle")}${tg("keyAlert","Contact key change alerts","Warn if someone’s encryption key changes")}${tg("hidePrev","Hide message previews","Don’t show message text in the chat list")}${tg("clipClear","Clear clipboard after copying","Wipes copied text after 30 seconds")}${pk("keep","Delete old messages")}</div>
 <div class="grp"><h3>Chat bubbles</h3>${pk("bshape","Bubble shape")}${pk("inc","Incoming bubbles")}${pk("ts","Timestamps")}<div class="row" style="cursor:default"><div><b>Sent bubble colour</b></div></div><div class="sw2">${BC.map(x=>`<i data-a="bcol" data-v="${x}" class="${(c.bcol||"")===x?"on":""}" style="background:${x||c.acc}"></i>`).join("")}</div></div>
 <div class="grp"><h3>Network and updates</h3>${act("server","Server address",(c.server||"Not set")+(c.token&&online===false?" · offline":""))}${act("claim","Username",c.user?"@"+c.user:"Tap to choose")}</div>
-<div class="grp"><h3>Account</h3>${act("fp","Test fingerprint","Check that your fingerprint sensor works")}${act("pin","Change PIN","Set a new 4-digit PIN")}${act("lock","Lock now","Require PIN or fingerprint to reopen")}${act("panic","Panic wipe","Erase every chat, setting and PIN","dng")}</div><p class="hint">Quantum Signal v${VER}</p></div>`}
+<div class="grp"><h3>Account</h3>${act("fp","Test fingerprint","Check that your fingerprint sensor works")}${act("pin","Change PIN","Set a new 4-digit PIN")}${act("lock","Lock now","Require PIN or fingerprint to reopen")}${act("resetnet","Reset server account","Remove your username and keys from this phone")}${act("panic","Panic wipe","Erase every chat, setting and PIN","dng")}</div><p class="hint">Quantum Signal v${VER}</p></div>`}
 function chatHTML(){const c=chat();return`<header class="ch"><button data-a="back" aria-label="Back">${ic("back")}</button><div class="who" data-a="info">${av(c.name,38)}<div><b>${E(c.name)}</b><small>${c.ver?"✓ Verified · ":""}${c.dis?"⏱ "+DL[c.dis]:"🔒 End-to-end encrypted"}</small></div></div><button data-a="cmenu" aria-label="More">${ic("more")}</button></header><div id="msgs"></div><div id="rp"></div><div class="bar"><input id="inp" placeholder="Message" autocomplete="off" ${C().incog?'autocorrect="off" spellcheck="false" autocapitalize="sentences"':""}><button class="snd" data-a="send" aria-label="Send">${ic("send")}</button></div>`}
 function renderMsgs(){const el=$("#msgs");if(!el||view!=="chat")return;const M=chat().msgs,mode=C().ts||"group";let h="",pd="";
 M.forEach((m,i)=>{const p=M[i-1],n=M[i+1],d=new Date(m.ts).toDateString();if(d!==pd){h+=`<div class="day">${dayLbl(m.ts)}</div>`;pd=d}
 const gp=p&&p.me===m.me&&m.ts-p.ts<18e4&&new Date(p.ts).toDateString()===d,gn=n&&n.me===m.me&&n.ts-m.ts<18e4&&new Date(n.ts).toDateString()===d,st=m.me?(m.st??1):0,sT=mode==="all"||(mode==="group"&&!gn);
-h+=`<div class="b ${m.me?"out":"in"}${gp?" gp":""}${gn?" gn":""}${st===-1?" bad":""}" data-a="mm" data-v="${E(m.id)}">${m.q?`<div class="q">${E(m.q)}</div>`:""}<span class="tx">${E(m.t)}</span><span class="mt">${m.exp?"⏱ ":""}${sT?fmt(m.ts):""}${m.me?tick(st):""}</span>${m.r?`<em>${m.r}</em>`:""}</div>`});
+h+=`<div class="b ${m.me?"out":"in"}${gp?" gp":""}${gn?" gn":""}${st===-1?" bad":""}" data-a="mm" data-v="${E(m.id)}">${m.q?`<div class="q">${E(m.q)}</div>`:""}<span class="tx">${E(m.t)}</span><span class="mt">${st===-1?(m.perm?"Not sent ":"Retrying "):""}${m.exp?"⏱ ":""}${sT?fmt(m.ts):""}${m.me?tick(st):""}</span>${m.r?`<em>${m.r}</em>`:""}</div>`});
 el.innerHTML=h;el.scrollTop=el.scrollHeight}
 function safety(c){let h=H(c.name+"qs"),o=[];for(let i=0;i<12;i++){h=(h*1103515245+12345)>>>0;o.push(String(h%100000).padStart(5,"0"))}return o}
-function send(){const i=$("#inp"),t=i.value.trim();if(!t)return;const c=chat(),m={id:uid(),me:1,t,ts:Date.now(),r:null,q:reply,st:c.pub?0:1,exp:c.dis?Date.now()+c.dis*1000:0};c.msgs.push(m);reply=null;i.value="";$("#rp").innerHTML="";save();renderMsgs();if(c.pub)relay(c,m)}
+function send(){const i=$("#inp"),t=i.value.trim();if(!t)return;if(t.length>4000)return toast("Message too long (4000 characters max)");const c=chat(),m={id:uid(),me:1,t,ts:Date.now(),r:null,q:reply,st:c.pub?0:1,exp:c.dis?Date.now()+c.dis*1000:0};c.msgs.push(m);reply=null;i.value="";$("#rp").innerHTML="";save();renderMsgs();if(c.pub)relay(c,m)}
 function msg(t){const m=$("#lm");if(m)m.textContent=t}
 function unlock(){locked=false;view="list";render()}
 function wipe(){try{localStorage.removeItem(KEY)}catch(e){}S=seed();applyTheme();locked=true;pin="";stage=0;view="list";tab="chats";render()}
 const A={
 tab(v){tab=v;render()},
-open(v){cur=v;view="chat";chat().unread=0;save();render();markRead(chat())},
+open(v){cur=v;view="chat";chat().unread=0;save();render();markRead(chat());keyCheck(chat())},
 back(){view="list";cur=null;render()},
 send,
 lock(){locked=true;pin="";render()},
@@ -157,29 +167,31 @@ if(v==="x")pin=pin.slice(0,-1);else if(pin.length<4)pin+=v;
 if(pin.length<4)return render();const c=C();
 if(!c.pin){if(!stage){first=pin;pin="";stage=1;return render()}
 if(pin===first){c.pin=pin;save();pin="";stage=0;return unlock()}pin="";stage=0;first="";render();return msg("PINs did not match. Try again.")}
-if(pin===c.pin){tries=0;pin="";return unlock()}
+if(pin===c.pin){tries=0;pin="";if(c.bio&&c.twofa)return A.bio2();return unlock()}
 tries++;pin="";if(tries>=10&&c.wipe10)return wipe();if(tries>=5)until=Date.now()+3e4;render();msg("Wrong PIN")},
-async bio(){if(await Bio.auth())unlock();else msg("Fingerprint unavailable here. Use your PIN.")},
-newchat(){const pool=["Sam Okafor","Priya Nair","Leo Martin","Hana Sato"].filter(n=>!S.chats.some(c=>c.name===n));sheet("New message",pool.map(n=>[n,()=>{S.chats.push({id:n,name:n,msgs:[],dis:C().disap,ver:false,unread:0});save();A.open(n)}]),pool.length?"":'<p class="hint">Everyone is already in your chats.</p>')},
-mm(v){const c=chat(),m=c.msgs.find(x=>x.id==v);if(!m)return;sheet("Message",[["Reply",()=>{reply=m.t;$("#rp").innerHTML=`<div class="rp"><span>${E(m.t)}</span><button data-a="xr" aria-label="Cancel reply">${ic("x",16)}</button></div>`;$("#inp").focus()}],...["❤️","👍","😂"].map(r=>["React "+r,()=>{m.r=m.r===r?null:r;save();renderMsgs();if(c.pub)tx(c,{k:"x",id:m.id,r:m.r}).catch(()=>{})}]),["Copy",()=>{try{navigator.clipboard.writeText(m.t)}catch(e){}toast("Copied")}],["Delete for me",()=>{c.msgs=c.msgs.filter(x=>x!==m);save();renderMsgs()}]])},
+async bio(){if(await Bio.auth())unlock();else{render();msg(Bio.err||"Fingerprint unavailable here. Use your PIN.")}},
+async bio2(){if(await Bio.auth())unlock();else{render();msg((Bio.err||"Fingerprint failed")+". Enter your PIN to try again.")}},
+mm(v){const c=chat(),m=c.msgs.find(x=>x.id==v);if(!m)return;sheet("Message",[...(m.me&&m.st===-1?[["Resend now",()=>{m.perm=0;m.tries=0;m.lt=0;relay(c,m)}]]:[]),["Reply",()=>{reply=m.t;$("#rp").innerHTML=`<div class="rp"><span>${E(m.t)}</span><button data-a="xr" aria-label="Cancel reply">${ic("x",16)}</button></div>`;$("#inp").focus()}],...["❤️","👍","😂"].map(r=>["React "+r,()=>{m.r=m.r===r?null:r;save();renderMsgs();if(c.pub)tx(c,{k:"x",id:m.id,r:m.r}).catch(()=>{})}]),["Copy",()=>{copy(m.t);if(C().clipClear)setTimeout(()=>copy(""),3e4);toast("Copied")}],["Delete for me",()=>{c.msgs=c.msgs.filter(x=>x!==m);save();renderMsgs()}]])},
 xr(){reply=null;$("#rp").innerHTML=""},
 cmenu(){const c=chat();sheet(E(c.name),[["Disappearing messages · "+DL[c.dis],()=>A.dis()],["View safety number",()=>A.info()],["Clear chat",()=>{c.msgs=[];save();renderMsgs()}],["Delete chat",()=>{S.chats=S.chats.filter(x=>x!==c);save();A.back()}]])},
 dis(){const c=chat();sheet("Disappearing messages",Object.entries(DL).map(([k,v])=>[v,()=>{c.dis=+k;save();render();toast("Timer: "+v)}]))},
 info(){const c=chat();sheet("Safety number",[[c.ver?"Mark as unverified":"Mark as verified",()=>{c.ver=!c.ver;save();render()}]],`<div class="sn">${safety(c).map(x=>`<span>${x}</span>`).join("")}</div><p class="hint">Compare these numbers with ${E(c.name)} in person to confirm no one is intercepting your chat.</p>`)},
 
 
-async tg(k){const c=C();if(k==="bio"&&!c.bio&&!(await Bio.auth()))return toast("Fingerprint is not available on this device or connection");c[k]=!c[k];save();render()},
+async tg(k){const c=C();if(!c[k]&&(k==="bio"||k==="twofa")){if(k==="twofa"&&!c.bio)return toast("Turn on fingerprint unlock first");if(!(await Bio.auth()))return toast(Bio.err||"Fingerprint is not available on this device")}c[k]=!c[k];if(k==="bio"&&!c.bio)c.twofa=false;save();render()},
 pick(k){const p=PK[k];sheet(p.t,p.o.map(([v,l])=>[l,()=>{C()[k]=v;save();applyTheme();render()}]))},
 acc(v){C().acc=v;save();applyTheme();render()},
-async fp(){toast(await Bio.auth()?"Fingerprint verified ✓":"Fingerprint check failed")},
-pin(){C().pin=null;save();locked=true;pin="";stage=0;render()},
+async fp(){toast(await Bio.auth()?"Fingerprint verified ✓":(Bio.err||"Fingerprint check failed"))},
+pin(){ask("Current PIN","Current PIN",v=>{if(v!==C().pin)return toast("Wrong PIN");C().pin=null;save();locked=true;pin="";stage=0;render()})},
+debug(){diag()},
+resetnet(){sheet("Reset server account?",[["Reset account",()=>{Object.assign(C(),{user:null,token:null,pub:null,priv:null});save();authWarned=false;render();toast("Account reset. Choose a username again.")}]],'<p class="hint">Removes your username and keys from this phone. Chats with other people stop working until you register again.</p>')},
 panic(){sheet("Wipe all data?",[["Yes, wipe everything now",wipe]],'<p class="hint">Deletes every chat, setting and your PIN from this device.</p>')}};
 document.addEventListener("click",e=>{const el=e.target.closest("[data-a]");if(el&&A[el.dataset.a])A[el.dataset.a](el.dataset.v)});
 document.addEventListener("input",e=>{if(e.target.id==="sq"){q=e.target.value;$("#cl").innerHTML=rows()}});
 document.addEventListener("keydown",e=>{if(e.key==="Enter"&&e.target.id==="inp")send()});
 document.addEventListener("visibilitychange",()=>{if(document.hidden){hid=Date.now();if(C().screenSec)document.body.classList.add("priv")}else{document.body.classList.remove("priv");if(!locked&&C().pin&&(Date.now()-hid)/1000>=C().autolock){locked=true;pin="";render()}}});
-setInterval(()=>{const n=Date.now();let ch=0;S.chats.forEach(c=>{const k=c.msgs.length;c.msgs=c.msgs.filter(m=>!m.exp||m.exp>n);if(c.msgs.length!==k)ch=1});if(ch&&!locked){save();view==="chat"?renderMsgs():render()}},1000);
-const VER="0.3.2";
+setInterval(()=>{const n=Date.now();let ch=0;if(!locked&&C().pin&&C().idle&&n-lastAct>C().idle*6e4){locked=true;pin="";render()}S.chats.forEach(c=>{const k=c.msgs.length;c.msgs=c.msgs.filter(m=>(!m.exp||m.exp>n)&&(!C().keep||n-m.ts<C().keep*864e5));if(c.msgs.length!==k)ch=1});if(ch&&!locked){save();view==="chat"?renderMsgs():render()}},1000);
+const VER="0.4.0";
 const SK={signal:{n:"Signal",acc:"#3a76f0",rad:18,wall:"",f:""},ios:{n:"iOS",acc:"#0a84ff",rad:20,wall:"",f:"-apple-system,BlinkMacSystemFont,'SF Pro Text',system-ui,sans-serif"},midnight:{n:"Midnight (OLED)",acc:"#8b5cf6",rad:16,wall:"#000",f:"",dark:1},aurora:{n:"Aurora",acc:"#14b8a6",rad:22,wall:"linear-gradient(160deg,#0f2027,#203a43,#2c5364)",f:"",dark:1},sunset:{n:"Sunset",acc:"#f97316",rad:20,wall:"linear-gradient(160deg,#fff1e6,#ffe0f0)",f:"",light:1}};
 /* End-to-end encryption: ECDH P-256 key agreement + AES-GCM. Server only ever sees ciphertext. */
 const Net={
@@ -191,16 +203,17 @@ async find(u){return(await Net.j("/user/"+encodeURIComponent(u))).pub},
 async enc(pub,t){const iv=crypto.getRandomValues(new Uint8Array(12));return{iv:b64e(iv),ct:b64e(await crypto.subtle.encrypt({name:"AES-GCM",iv},await Net.shared(pub),new TextEncoder().encode(t)))}},
 async dec(pub,m){return new TextDecoder().decode(await crypto.subtle.decrypt({name:"AES-GCM",iv:b64d(m.iv)},await Net.shared(pub),b64d(m.ct)))}};
 Net.msg=e=>e.name==="AbortError"?"the server timed out":e instanceof TypeError?"can’t reach the server":e.message;
-Object.assign(PK,{bshape:{t:"Bubble shape",o:[["signal","Signal (rounded, grouped)"],["soft","Extra round"],["sharp","Square"]]},inc:{t:"Incoming bubbles",o:[["plain","Standard"],["tint","Tinted to match"]]},ts:{t:"Timestamps",o:[["all","On every message"],["group","End of each group"],["off","Hidden"]]}});
+Object.assign(PK,{bshape:{t:"Bubble shape",o:[["signal","Signal (rounded, grouped)"],["soft","Extra round"],["sharp","Square"]]},inc:{t:"Incoming bubbles",o:[["plain","Standard"],["tint","Tinted to match"]]},ts:{t:"Timestamps",o:[["all","On every message"],["group","End of each group"],["off","Hidden"]]},idle:{t:"Lock when idle",o:[[0,"Never"],[1,"After 1 minute"],[5,"After 5 minutes"],[15,"After 15 minutes"]]},keep:{t:"Delete old messages",o:[[0,"Never"],[1,"After 1 day"],[7,"After 1 week"],[30,"After 30 days"]]}});
 const BC=["","#2c6bed","#6d4df2","#d6336c","#1f9d6b","#e8590c","#343a40"];
 const uid=()=>Date.now().toString(36)+Math.random().toString(36).slice(2,8),busy=new Set();let online=null;
 const dayLbl=t=>new Date(t).toDateString()===new Date().toDateString()?"Today":new Date(t).toLocaleDateString([],{weekday:"long",month:"short",day:"numeric"});
 const tick=st=>`<svg class="tk" width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">${st===-1?'<circle cx="8" cy="8" r="6.5" stroke="#ff9a9a"/><path d="M8 4.6v4M8 11.2v.1" stroke="#ff9a9a"/>':st===0?'<circle cx="8" cy="8" r="6.5" stroke-dasharray="2 2.4"/>':st===1?'<circle cx="8" cy="8" r="6.5"/><path d="M5 8.2l2 2 3.6-4"/>':st===2?'<circle cx="8" cy="8" r="6.5"/><path d="M3.8 8.2l2 2 3-3.4M7 9.6l.4.4 3.8-4.4"/>':'<circle cx="8" cy="8" r="7" fill="currentColor"/><path d="M3.8 8.2l2 2 3-3.4M7 9.6l.4.4 3.8-4.4" stroke="var(--bo,var(--acc))"/>'}</svg>`;
 async function tx(c,p){const e=await Net.enc(c.pub,JSON.stringify(p));await Net.j("/send",{method:"POST",body:JSON.stringify({from:C().user,to:c.id,...e})})}
-async function relay(c,m){if(busy.has(m.id))return;busy.add(m.id);try{await tx(c,{k:"m",id:m.id,t:m.t,q:m.q||undefined});m.st=Math.max(m.st||0,1)}catch(x){m.st=-1;m.tries=(m.tries||0)+1;if(m.tries===1)toast("Couldn’t send: "+Net.msg(x)+". Retrying…")}busy.delete(m.id);save();renderMsgs()}
+const PERM=/not found|bad message|too large|auth|bad key|invalid|inbox full/i;
+async function relay(c,m){if(busy.has(m.id))return;busy.add(m.id);m.lt=Date.now();try{await tx(c,{k:"m",id:m.id,t:m.t,q:m.q||undefined});m.st=Math.max(m.st||0,1);delete m.err;delete m.perm}catch(x){const e=Net.msg(x);m.st=-1;m.err=e;m.tries=(m.tries||0)+1;m.perm=PERM.test(e)?1:0;logErr("send",e);if(m.tries===1)toast(m.perm?"Couldn’t send: "+(/auth/i.test(e)?"the server doesn’t recognise your account":e):"No connection. Will retry automatically.")}busy.delete(m.id);save();renderMsgs()}
 async function markRead(c){if(!c||!c.pub||!C().receipts||document.hidden||locked)return;const ids=c.msgs.filter(m=>!m.me&&!m.rs).map(m=>m.id);if(!ids.length)return;c.msgs.forEach(m=>{if(!m.me)m.rs=1});save();try{await tx(c,{k:"r",ids})}catch(e){c.msgs.forEach(m=>{if(ids.includes(m.id))m.rs=0})}}
 async function poll(){if(!C().token||locked)return;
-S.chats.forEach(c=>c.pub&&c.msgs.forEach(m=>{if(m.me&&m.st===-1&&(m.tries||0)<8)relay(c,m)}));
+S.chats.forEach(c=>c.pub&&c.msgs.forEach(m=>{if(m.me&&m.st===-1&&!m.perm&&(m.tries||0)<12&&Date.now()-(m.lt||0)>Math.min(2e3*2**(m.tries||0),6e4))relay(c,m)}));
 try{const d=await Net.j("/inbox?u="+encodeURIComponent(C().user));online=true;const dl={};let bad=0;
 for(const e of d.m){let c=S.chats.find(x=>x.id===e.from);
 if(!c){try{c={id:e.from,name:e.from,msgs:[],dis:C().disap,ver:false,unread:0,pub:await Net.find(e.from)}}catch(x){bad++;continue}S.chats.push(c)}
@@ -211,10 +224,58 @@ else if(p.k==="x"){const m=c.msgs.find(x=>x.id===p.id);if(m)m.r=p.r||null}}
 if(d.m.length){save();if(view==="chat")renderMsgs();else if(tab==="chats"&&document.activeElement.id!=="sq")render()}
 if(bad)toast(bad+" message"+(bad>1?"s":"")+" couldn’t be decrypted");
 for(const k in dl)tx(dl[k].c,{k:"d",ids:dl[k].ids}).catch(()=>{});
-if(view==="chat")markRead(chat())}catch(e){online=false}}
+if(view==="chat")markRead(chat())}catch(e){online=false;logErr("poll",Net.msg(e));if(e.message==="auth"&&!authWarned){authWarned=true;toast("The server doesn’t recognise your account. Settings → Account → Reset server account.")}}}
 setInterval(poll,2000);
 A.bcol=v=>{C().bcol=v;save();applyTheme();render()};
-function ask(t,ph,cb,extra=[]){window._u="";sheet(t,[["Save",()=>cb(window._u.trim().toLowerCase()===window._u.trim()?window._u.trim():window._u.trim())],...extra],`<div style="padding:4px 16px"><input class="srch" style="margin:0;width:100%;box-sizing:border-box" placeholder="${ph}" autocapitalize="none" autocomplete="off" oninput="window._u=this.value"></div>`)}
+const newer=(a,b)=>{const x=String(a).split(".").map(Number),y=String(b).split(".").map(Number);for(let i=0;i<3;i++)if((x[i]||0)!==(y[i]||0))return(x[i]||0)>(y[i]||0);return false};
+async function copy(t){try{await navigator.clipboard.writeText(t);return true}catch(e){try{const a=document.createElement("textarea");a.value=t;a.style.cssText="position:fixed;opacity:0";document.body.append(a);a.select();const ok=document.execCommand("copy");a.remove();return ok}catch(x){return false}}}
+const ERR=[];let authWarned=false,lastAct=Date.now();
+function logErr(w,m){ERR.push({t:Date.now(),w,m:String(m&&m.message||m).slice(0,160)});if(ERR.length>30)ERR.shift()}
+addEventListener("error",e=>logErr("js",(e.message||"error")+(e.lineno?" (line "+e.lineno+")":"")));
+addEventListener("unhandledrejection",e=>logErr("promise",e.reason));
+["pointerdown","keydown","touchstart"].forEach(t=>addEventListener(t,()=>{lastAct=Date.now()},{passive:true}));
+async function keyCheck(c){if(!c||!c.pub||!C().keyAlert||!C().server)return;try{const p=await Net.find(c.id);if(p.x!==c.pub.x||p.y!==c.pub.y)sheet("Safety number changed",[["Trust new key",()=>{c.pub=p;c.ver=false;save();render()}],["Keep old key",()=>{}]],`<p class="hint">${E(c.name)}’s encryption key is different from before. This happens when they reinstall the app, or if someone is intercepting your chat. Check their safety number before trusting it.</p>`)}catch(e){}}
+const DEF={autolock:30,disap:0,theme:"system",font:16,bshape:"signal",inc:"plain",ts:"group",idle:0,keep:0};
+async function diag(){toast("Checking…");const L=[],F=[],cfg=C();let reset=0;const add=(k,n,d="")=>L.push({k,n,d});
+add("ok","App version","v"+VER+(Bio.native()?" · installed app":" · browser"));
+isSecureContext&&window.crypto&&crypto.subtle?add("ok","Secure context and encryption available"):add("bad","Encryption unavailable","This page isn’t secure. It needs HTTPS or the installed app.");
+try{localStorage.setItem("qs_t","1");localStorage.removeItem("qs_t");add("ok","Storage works")}catch(e){add("bad","Storage is blocked","Chats and settings can’t be saved.")}
+try{const g=()=>crypto.subtle.generateKey({name:"ECDH",namedCurve:"P-256"},false,["deriveKey"]),a=await g(),b=await g(),d=(p,q)=>crypto.subtle.deriveKey({name:"ECDH",public:q.publicKey},p.privateKey,{name:"AES-GCM",length:256},false,["encrypt","decrypt"]),k1=await d(a,b),k2=await d(b,a),iv=crypto.getRandomValues(new Uint8Array(12)),ct=await crypto.subtle.encrypt({name:"AES-GCM",iv},k1,new TextEncoder().encode("ping"));new TextDecoder().decode(await crypto.subtle.decrypt({name:"AES-GCM",iv},k2,ct))==="ping"?add("ok","Encryption self-test passed"):add("bad","Encryption self-test failed")}catch(e){add("bad","Encryption self-test failed",String(e.message||e))}
+let fm=0,fc=0,fs=0,fo=0;const seen=new Set();
+if(!Array.isArray(S.chats)){S.chats=[];fc++}
+S.chats=S.chats.filter(c=>{if(!c||typeof c.id!=="string"||!Array.isArray(c.msgs)){fc++;return false}
+if(typeof c.name!=="string")c.name=c.id;if(typeof c.unread!=="number")c.unread=0;if(!(c.dis in DL))c.dis=0;
+const n=c.msgs.length;c.msgs=c.msgs.filter(m=>m&&typeof m.t==="string"&&typeof m.ts==="number");fm+=n-c.msgs.length;
+c.msgs.forEach(m=>{if(m.id==null||seen.has(m.id)){m.id=uid();fm++}seen.add(m.id);if(m.me&&m.st===0&&Date.now()-m.ts>3e4&&!busy.has(m.id)){m.st=-1;m.tries=0;m.perm=0;m.lt=0;fs++}});
+if(c.id!=="Note to Self"&&!c.pub&&!c.msgs.length){fc++;return false}return true});
+for(const k in PK)if(!PK[k].o.some(x=>x[0]==cfg[k])){cfg[k]=DEF[k];fo++}
+if(fm)F.push("Removed or repaired "+fm+" damaged message"+(fm>1?"s":""));if(fc)F.push("Removed "+fc+" empty or damaged chat"+(fc>1?"s":""));if(fo)F.push("Reset "+fo+" invalid setting"+(fo>1?"s":"")+" to default");if(fs)F.push("Re-queued "+fs+" stuck message"+(fs>1?"s":"")+" for sending");
+const nk=S.chats.filter(c=>c.id!=="Note to Self"&&!c.pub).length;
+nk?add("warn",nk+" chat"+(nk>1?"s":"")+" without an encryption key","Messages in them can’t be sent. Delete them and start again from the username search."):add("ok","Saved data is healthy");
+const fl=S.chats.flatMap(c=>c.msgs.filter(m=>m.me&&m.st===-1)),pm=fl.filter(m=>m.perm);
+fl.forEach(m=>{if(!m.perm){m.tries=0;m.lt=0}});
+if(fl.length-pm.length)add("warn",(fl.length-pm.length)+" message(s) waiting to send","Retrying now. They go out as soon as the server is reachable.");
+if(pm.length)add("bad",pm.length+" message(s) couldn’t be sent",(pm[0].err||"Unknown error")+". Tap the message to resend or delete it.");
+if(!fl.length)add("ok","No unsent messages");
+const bi=await Bio.info();
+if(cfg.bio)bi.ok?add("ok","Fingerprint sensor ready",bi.kind==="native"?"Using the phone’s fingerprint hardware":"Using the device unlock"):add("warn","Fingerprint unavailable",(bi.err||"")+". Your PIN still works.");else add("ok","Fingerprint unlock is off","Turn it on in Settings → Privacy and security");
+if(cfg.twofa&&!bi.ok){cfg.twofa=false;F.push("Turned off Fingerprint + PIN because no fingerprint sensor is available (prevents a lock-out)")}
+if(!cfg.server)add("warn","No server address","Set one in Settings → Network and updates to send messages.");
+else{let up=false;
+if(!Bio.native()&&location.protocol==="https:"&&/^http:/.test(cfg.server)&&!/127\.0\.0\.1|localhost/.test(cfg.server))add("warn","Browsers block http servers on https pages","Use the installed app, or put the server behind HTTPS.");
+try{const h=await Net.j("/health");up=true;add("ok","Server reachable",h.users+" account"+(h.users===1?"":"s"))}catch(e){add("bad","Server not reachable",Net.msg(e)+". Check the server is running and the address "+cfg.server+" is right.")}
+if(up&&cfg.token){try{const p=await Net.find(cfg.user);cfg.pub&&p.x===cfg.pub.x&&p.y===cfg.pub.y?add("ok","Your account is registered","@"+cfg.user):(add("bad","Account keys don’t match the server","Someone may have taken @"+cfg.user+", or the server was reset."),reset=1)}catch(e){e.message==="not found"?(add("bad","Your username isn’t on this server","The server data was reset."),reset=1):add("warn","Couldn’t verify your account",Net.msg(e))}}
+else if(up)add("warn","No username yet","Choose one in Settings → Network and updates.")}
+UP.s==="avail"?add("warn","Update available","v"+UP.v+". Tap Update now at the top of Settings."):UP.s==="error"?add("warn","Couldn’t check for updates"):add("ok","App is up to date");
+ERR.length?add("warn",ERR.length+" error"+(ERR.length>1?"s":"")+" logged this session",ERR.slice(-3).map(e=>e.w+": "+e.m).join(" · ")):add("ok","No errors logged");
+save();if(!locked)render();if(cfg.token)poll();
+const nb=L.filter(x=>x.k==="bad").length,nw=L.filter(x=>x.k==="warn").length;
+const txt="Quantum Signal v"+VER+" report\n"+L.map(x=>(x.k==="ok"?"[ok] ":x.k==="warn"?"[!] ":"[x] ")+x.n+(x.d?" - "+x.d:"")).join("\n")+(F.length?"\nFixed: "+F.join("; "):"")+(ERR.length?"\nLog:\n"+ERR.map(e=>new Date(e.t).toISOString().slice(11,19)+" "+e.w+" "+e.m).join("\n"):"");
+const html=`<p class="hint">${nb?nb+" problem"+(nb>1?"s":""):"No problems"}${nw?", "+nw+" warning"+(nw>1?"s":""):""}${F.length?" · "+F.length+" fixed automatically":""}</p>`+F.map(f=>`<div class="dg ok"><b>🔧 Fixed</b><small>${E(f)}</small></div>`).join("")+L.map(x=>`<div class="dg ${x.k}"><b>${x.k==="ok"?"✓":x.k==="warn"?"⚠":"✗"} ${E(x.n)}</b>${x.d?`<small>${E(x.d)}</small>`:""}</div>`).join("");
+const items=[["Copy report",async()=>{toast(await copy(txt)?"Report copied":"Couldn’t copy the report")}],["Run again",diag]];
+if(reset)items.unshift(["Reset server account",()=>A.resetnet()]);
+sheet("Error check",items,html)}
+function ask(t,ph,cb,extra=[]){window._u="";sheet(t,[["Save",()=>cb(window._u.trim().toLowerCase()===window._u.trim()?window._u.trim():window._u.trim())],...extra],`<div style="padding:4px 16px"><input class="srch" style="margin:0;width:100%;box-sizing:border-box" placeholder="${ph}" ${ph==="Current PIN"?'type="password" inputmode="numeric" maxlength="4"':""} autocapitalize="none" autocomplete="off" oninput="window._u=this.value"></div>`)}
 Object.assign(A,{
 newchat(){ask("Find by username","username",async v=>{const u=v.toLowerCase();if(!C().token)return toast("Choose a username in Settings first");if(u===C().user)return toast("That’s your own username");try{const pub=await Net.find(u);if(!S.chats.some(c=>c.id===u))S.chats.push({id:u,name:u,msgs:[],dis:C().disap,ver:false,unread:0,pub});save();A.open(u)}catch(e){toast(e.message==="not found"?"No user “"+u+"” found":"Couldn’t search: "+Net.msg(e))}})},
 server(){ask("Server address","http://YOUR_IP:3000",v=>{C().server=v&&!/^https?:\/\//.test(v)?"http://"+v:v;save();render()})},
@@ -227,10 +288,10 @@ const rs=()=>{if(!locked&&view==="list"&&tab==="set")render()};
 const upCard=()=>{const a=UP.s;return`<div class="upc ${a}"><div><b>${a==="avail"?"Update available · v"+E(UP.v):a==="checking"?"Checking for updates…":a==="applying"?"Installing update…":a==="latest"?"You’re up to date":a==="error"?"Couldn’t check for updates":"Quantum Signal v"+VER}</b><small>${a==="avail"?E(UP.notes||"A new version is ready."):a==="error"?"Updates work in the installed or hosted app.":"Version "+VER}</small></div><button data-a="updgo">${a==="avail"?"Update now":a==="checking"?"Checking…":a==="applying"?"Updating…":"Check again"}</button></div>`};
 async function chkUp(){if(UP.s==="checking"||UP.s==="applying")return;const was=UP.s;UP.s="checking";rs();
 try{const d=await(await fetch("version.json?"+Date.now(),{cache:"no-store"})).json();if(!d.version)throw 0;if(d.server&&!C().token&&C().server!==d.server){C().server=d.server;save()}
-if(d.version===VER)UP.s="latest";else{UP={s:"avail",v:String(d.version),notes:d.notes||""};if(was!=="avail")toast("Update available: v"+UP.v)}}catch(e){UP.s="error"}rs();if(!locked&&view==="list"&&tab==="chats")render()}
+if(!newer(d.version,VER))UP.s="latest";else{UP={s:"avail",v:String(d.version),notes:d.notes||""};if(was!=="avail")toast("Update available: v"+UP.v)}}catch(e){UP.s="error"}rs();if(!locked&&view==="list"&&tab==="chats")render()}
 async function applyUp(){UP.s="applying";rs();toast("Downloading update…");try{for(const k of await caches.keys())await caches.delete(k)}catch(e){}location.replace(location.pathname+"?v="+UP.v+"&t="+Date.now())}
 A.updgo=()=>UP.s==="avail"?applyUp():chkUp();
 A.upd=()=>chkUp();
 const t0=A.tab;A.tab=v=>{t0(v);if(v==="set")chkUp()};
-load();applyTheme();render();if(window.Capacitor&&C().bio&&C().pin)setTimeout(A.bio,400);setTimeout(()=>A.upd(1),3000);
+load();applyTheme();render();if(Bio.native()&&C().bio&&C().pin&&!C().twofa)setTimeout(A.bio,400);setTimeout(()=>A.upd(1),3000);
 </script></body></html>
