@@ -45,7 +45,7 @@ APK=$(find apk -name '*.apk' | head -1)
 [ -n "$APK" ] || die "APK file missing in download"
 echo "Found $APK"
 
-cat > /tmp/qs-setup.sh <<'REMOTE'
+cat > ${TMPDIR:-/tmp}/qs-setup.sh <<'REMOTE'
 set -u
 S=""; [ "$(id -u)" -ne 0 ] && S="sudo"
 say(){ echo "-- $*"; }
@@ -137,13 +137,13 @@ for i in "${!TARGETS[@]}"; do
       || { echo "Could not log in to $T, skipping it."; FAILED="${FAILED:-} $T"; continue; }
   fi
 
-  printf 'PORT=3000\nSELF=%s\nPEERS=%s\nCLUSTER_KEY=%s\n' "${URLS[$i]}" "$ALL" "$KEY" > /tmp/qs-env
+  printf 'PORT=3000\nSELF=%s\nPEERS=%s\nCLUSTER_KEY=%s\n' "${URLS[$i]}" "$ALL" "$KEY" > ${TMPDIR:-/tmp}/qs-env
   tar czf - server | ssh $SSHO "$T" 'mkdir -p ~/quantum-signal-server && tar xzf - -C ~/quantum-signal-server --strip-components=1' || { echo "Upload to $T failed, skipping."; FAILED="${FAILED:-} $T"; continue; }
-  scp -q $SSHO /tmp/qs-env "$T:quantum-signal-server/.env" && ssh $SSHO "$T" 'chmod 600 ~/quantum-signal-server/.env'
+  scp -q $SSHO ${TMPDIR:-/tmp}/qs-env "$T:quantum-signal-server/.env" && ssh $SSHO "$T" 'chmod 600 ~/quantum-signal-server/.env'
   scp -q $SSHO "$APK" "$T:quantum-signal.apk"
-  scp -q $SSHO /tmp/qs-setup.sh "$T:qs-setup.sh"
-  ssh -t $SSHO "$T" 'bash ~/qs-setup.sh; rm -f ~/qs-setup.sh' | tee "/tmp/qs.out.$n"
-  grep -aq 'QS_ERR=node' "/tmp/qs.out.$n" && { echo "Could not install Node.js on $T"; FAILED="${FAILED:-} $T"; }
+  scp -q $SSHO ${TMPDIR:-/tmp}/qs-setup.sh "$T:qs-setup.sh"
+  ssh -t $SSHO "$T" 'bash ~/qs-setup.sh; rm -f ~/qs-setup.sh' | tee "${TMPDIR:-/tmp}/qs.out.$n"
+  grep -aq 'QS_ERR=node' "${TMPDIR:-/tmp}/qs.out.$n" && { echo "Could not install Node.js on $T"; FAILED="${FAILED:-} $T"; }
 done
 
 printf '%s\n' "${TARGETS[@]}" > "$QS_LIST"   # remember them for next time

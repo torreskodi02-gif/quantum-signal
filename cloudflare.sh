@@ -62,9 +62,9 @@ if echo "$LIST" | jq -e --arg n "$NAME" '.result[]?|select(.id==$n)' >/dev/null 
 else
   MIG=',"migrations":{"new_tag":"v1","new_sqlite_classes":["Hub"]}'; echo "Creating your server."
 fi
-printf '{"main_module":"worker.js","compatibility_date":"2025-06-01","bindings":[{"type":"durable_object_namespace","name":"HUB","class_name":"Hub"}]%s}' "$MIG" > /tmp/qs-meta.json
+printf '{"main_module":"worker.js","compatibility_date":"2025-06-01","bindings":[{"type":"durable_object_namespace","name":"HUB","class_name":"Hub"}]%s}' "$MIG" > ${TMPDIR:-/tmp}/qs-meta.json
 UP=$(cf -X PUT "$API/accounts/$ACC/workers/scripts/$NAME" \
-  -F "metadata=@/tmp/qs-meta.json;type=application/json" \
+  -F "metadata=@${TMPDIR:-/tmp}/qs-meta.json;type=application/json" \
   -F "worker.js=@cloudflare/worker.js;type=application/javascript+module")
 echo "$UP" | jq -e '.success==true' >/dev/null 2>&1 || { echo "$UP" | jq -r '.errors[]?|"  "+.message' 2>/dev/null; die "Cloudflare did not accept the upload (reason above)."; }
 
