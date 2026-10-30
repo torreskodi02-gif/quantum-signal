@@ -6,10 +6,19 @@
 # app switches to another server automatically if one goes down.
 set -u
 cd "$(dirname "$0")"
+. ./servers.sh
 say(){ printf '\n\033[1m== %s\033[0m\n' "$*"; }
 die(){ printf '\n\033[31mERROR: %s\033[0m\n' "$*" >&2; exit 1; }
 
 TARGETS=("$@")
+if [ ${#TARGETS[@]} -eq 0 ]; then
+  mapfile -t TARGETS < <(find_targets)
+  if [ ${#TARGETS[@]} -gt 0 ]; then
+    echo "I found these servers on my own: ${TARGETS[*]}"
+    read -rp "Use them? [Y/n] " A
+    case "$A" in n|N) TARGETS=();; esac
+  fi
+fi
 if [ ${#TARGETS[@]} -eq 0 ]; then
   read -rp "Server login(s), separated by spaces (user@ip user@ip ...): " LINE
   read -ra TARGETS <<<"$LINE"
@@ -137,12 +146,13 @@ for i in "${!TARGETS[@]}"; do
   grep -aq 'QS_ERR=node' "/tmp/qs.out.$n" && { echo "Could not install Node.js on $T"; FAILED="${FAILED:-} $T"; }
 done
 
+printf '%s\n' "${TARGETS[@]}" > "$QS_LIST"   # remember them for next time
 say "Checking every server from your phone"
 UPN=0
 for u in "${URLS[@]}"; do
   if curl -fsS --max-time 10 "$u/health" 2>/dev/null | grep -q '"ok":true'; then echo "  OK    $u"; UPN=$((UPN+1)); else echo "  DOWN  $u  (check the provider's firewall allows ports 80 and 3000)"; fi
 done
-[ "$UPN" -eq 0 ] && die "No server answered. Fix the firewall or the errors above, then run this again."
+[ "$UPN" -eq 0 ] && die "No server answered. Run: bash check.sh   (it finds the problem by itself and tells you the fix)"
 
 say "Telling the app about the servers"
 V=$(grep -o '"version":"[^"]*"' www/version.json | cut -d'"' -f4)

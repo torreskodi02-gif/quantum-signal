@@ -129,16 +129,23 @@ http.createServer(async(req,res)=>{try{
     await fanout('/peer/msg',{to,env},true);
     return out(res,200,{ok:true,id:env.id})}
 
-  if(p==='/inbox'){const u=url.searchParams.get('u');
+  if(p==='/inbox'){
+    // POST {u,wait,ack:[ids]}: messages stay stored until the phone acknowledges them (nothing is lost if a reply is dropped).
+    // GET ?u=&wait=: older apps; messages are removed as they are handed over.
+    const post=req.method==='POST';let u,wait,ack=[];
+    if(post){const o=parse(raw);u=o.u;wait=o.wait;ack=Array.isArray(o.ack)?o.ack.filter(x=>str(x,64)).slice(0,500):[]}
+    else{u=url.searchParams.get('u');wait=url.searchParams.get('wait')}
     if(!auth(u,t))throw new HttpErr(401,'auth');
+    if(ack.length){const set=new Set(ack);db.box[u]=(db.box[u]||[]).filter(x=>!set.has(x.id));if(!db.box[u].length)delete db.box[u];
+      ack.forEach(id=>{db.acked[id]=Date.now()});save();fanout('/peer/ack',{ids:ack})}
     const take=()=>{const all=(db.box[u]||[]).filter(m=>Date.now()-m.ts<TTL),m=all.slice(0,200);
-      if(!m.length)return m;
-      db.box[u]=all.slice(200);if(!db.box[u].length)delete db.box[u];
-      m.forEach(x=>{db.acked[x.id]=Date.now()});save();fanout('/peer/ack',{ids:m.map(x=>x.id)});return m};
+      if(!post&&m.length){db.box[u]=all.slice(200);if(!db.box[u].length)delete db.box[u];
+        m.forEach(x=>{db.acked[x.id]=Date.now()});save();fanout('/peer/ack',{ids:m.map(x=>x.id)})}
+      return m};
     let m=take();
-    const wait=Math.min(25,Math.max(0,Number(url.searchParams.get('wait'))||0));   // long polling: hold the request open
-    if(!m.length&&wait){let closed=false;res.on('close',()=>{if(!res.writableEnded)closed=true});
-      await new Promise(done=>{const s=waiters.get(u)||new Set(),f=()=>{clearTimeout(tm);s.delete(f);if(!s.size&&waiters.get(u)===s)waiters.delete(u);done()},tm=setTimeout(f,wait*1000);waiters.set(u,s);s.add(f);res.on('close',f)});
+    const w=Math.min(50,Math.max(0,Number(wait)||0));   // long polling: hold the request open until something arrives
+    if(!m.length&&w){let closed=false;res.on('close',()=>{if(!res.writableEnded)closed=true});
+      await new Promise(done=>{const s=waiters.get(u)||new Set(),f=()=>{clearTimeout(tm);s.delete(f);if(!s.size&&waiters.get(u)===s)waiters.delete(u);done()},tm=setTimeout(f,w*1000);waiters.set(u,s);s.add(f);res.on('close',f)});
       if(closed)return;m=take()}
     return out(res,200,{m})}
 

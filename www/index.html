@@ -191,7 +191,7 @@ document.addEventListener("input",e=>{if(e.target.id==="sq"){q=e.target.value;$(
 document.addEventListener("keydown",e=>{if(e.key==="Enter"&&e.target.id==="inp")send()});
 document.addEventListener("visibilitychange",()=>{if(document.hidden){hid=Date.now();if(C().screenSec)document.body.classList.add("priv")}else{document.body.classList.remove("priv");if(!locked&&C().pin&&(Date.now()-hid)/1000>=C().autolock){locked=true;pin="";render()}}});
 setInterval(()=>{const n=Date.now();let ch=0;if(!locked&&C().pin&&C().idle&&n-lastAct>C().idle*6e4){locked=true;pin="";render()}S.chats.forEach(c=>{const k=c.msgs.length;c.msgs=c.msgs.filter(m=>(!m.exp||m.exp>n)&&(!C().keep||n-m.ts<C().keep*864e5));if(c.msgs.length!==k)ch=1});if(ch&&!locked){save();view==="chat"?renderMsgs():render()}},1000);
-const VER="0.5.1";
+const VER="0.6.0";
 const SK={signal:{n:"Signal",acc:"#3a76f0",rad:18,wall:"",f:""},ios:{n:"iOS",acc:"#0a84ff",rad:20,wall:"",f:"-apple-system,BlinkMacSystemFont,'SF Pro Text',system-ui,sans-serif"},midnight:{n:"Midnight (OLED)",acc:"#8b5cf6",rad:16,wall:"#000",f:"",dark:1},aurora:{n:"Aurora",acc:"#14b8a6",rad:22,wall:"linear-gradient(160deg,#0f2027,#203a43,#2c5364)",f:"",dark:1},sunset:{n:"Sunset",acc:"#f97316",rad:20,wall:"linear-gradient(160deg,#fff1e6,#ffe0f0)",f:"",light:1}};
 /* End-to-end encryption: ECDH P-256 key agreement + AES-GCM. Server only ever sees ciphertext. */
 const Net={
@@ -218,19 +218,24 @@ const PERM=/not found|bad message|too large|auth|bad key|invalid|inbox full/i;
 async function relay(c,m){if(busy.has(m.id))return;busy.add(m.id);m.lt=Date.now();try{await tx(c,{k:"m",id:m.id,t:m.t,q:m.q||undefined});m.st=Math.max(m.st||0,1);delete m.err;delete m.perm}catch(x){const e=Net.msg(x);m.st=-1;m.err=e;m.tries=(m.tries||0)+1;m.perm=PERM.test(e)?1:0;logErr("send",e);if(m.tries===1)toast(m.perm?"Couldn’t send: "+(/auth/i.test(e)?"the server doesn’t recognise your account":e):"No connection. Will retry automatically.")}busy.delete(m.id);save();renderMsgs()}
 async function markRead(c){if(!c||!c.pub||!C().receipts||document.hidden||locked)return;const ids=c.msgs.filter(m=>!m.me&&!m.rs).map(m=>m.id);if(!ids.length)return;c.msgs.forEach(m=>{if(!m.me)m.rs=1});save();try{await tx(c,{k:"r",ids})}catch(e){c.msgs.forEach(m=>{if(ids.includes(m.id))m.rs=0})}}
 async function pollOnce(){if(!C().token||locked)return;
-try{const d=await Net.j("/inbox?u="+encodeURIComponent(C().user)+"&wait=25",{timeout:32000});online=true;const dl={};let bad=0;
+try{const ack=(S.ack||[]).slice(0,200);let d;
+try{if(legacyInbox)throw Object.assign(new Error("not found"),{status:404});d=await Net.j("/inbox",{method:"POST",body:JSON.stringify({u:C().user,wait:45,ack}),timeout:52000})}
+catch(x){if(x.message==="not found"&&x.status===404){legacyInbox=true;d=await Net.j("/inbox?u="+encodeURIComponent(C().user)+"&wait=25",{timeout:32000})}else throw x}
+online=true;if(!legacyInbox&&ack.length){S.ack=S.ack.filter(id=>!ack.includes(id));save()}const dl={};let bad=0;
 for(const e of d.m){let c=S.chats.find(x=>x.id===e.from);
 if(!c){try{c={id:e.from,name:e.from,msgs:[],dis:C().disap,ver:false,unread:0,pub:await Net.find(e.from)}}catch(x){bad++;continue}S.chats.push(c)}
-let p;try{const raw=await Net.dec(c.pub,e);try{p=JSON.parse(raw)}catch(x){}if(!p||!p.k)p={k:"m",id:uid(),t:raw}}catch(x){bad++;continue}
+let p;try{const raw=await Net.dec(c.pub,e);try{p=JSON.parse(raw)}catch(x){}if(!p||!p.k)p={k:"m",id:uid(),t:raw}}catch(x){bad++;done(e.id);continue}
 if(p.k==="m"){if(!c.msgs.some(x=>x.id===p.id)){c.msgs.push({id:p.id,me:0,t:String(p.t),q:p.q||null,ts:e.ts,r:null,exp:c.dis?Date.now()+c.dis*1000:0});if(!(view==="chat"&&cur===c.id&&!document.hidden))c.unread++}(dl[c.id]=dl[c.id]||{c,ids:[]}).ids.push(p.id)}
 else if(p.k==="d"||p.k==="r"){(p.ids||[]).forEach(id=>{const m=c.msgs.find(x=>x.id===id&&x.me);if(m)m.st=Math.max(m.st??1,p.k==="d"?2:3)})}
-else if(p.k==="x"){const m=c.msgs.find(x=>x.id===p.id);if(m)m.r=p.r||null}}
+else if(p.k==="x"){const m=c.msgs.find(x=>x.id===p.id);if(m)m.r=p.r||null}done(e.id)}
 if(d.m.length){save();if(view==="chat")renderMsgs();else if(tab==="chats"&&document.activeElement.id!=="sq")render()}
 if(bad)toast(bad+" message"+(bad>1?"s":"")+" couldn’t be decrypted");
 for(const k in dl)tx(dl[k].c,{k:"d",ids:dl[k].ids}).catch(()=>{});
 if(view==="chat")markRead(chat())}catch(e){online=false;logErr("poll",Net.msg(e));if(e.message==="auth"&&!authWarned){authWarned=true;toast("The server doesn’t recognise your account. Settings → Account → Reset server account.")}}}
 function retryFailed(){if(!C().token||locked)return;S.chats.forEach(c=>c.pub&&c.msgs.forEach(m=>{if(m.me&&m.st===-1&&!m.perm&&(m.tries||0)<12&&Date.now()-(m.lt||0)>Math.min(2e3*2**(m.tries||0),6e4))relay(c,m)}));}
 setInterval(retryFailed,2000);
+let legacyInbox=false;
+function done(id){if(legacyInbox||!id)return;const a=S.ack||(S.ack=[]);if(!a.includes(id))a.push(id)}
 let inPoll=false;async function poll(){if(inPoll)return;inPoll=true;try{await pollOnce()}finally{inPoll=false}}
 setTimeout(async()=>{while(true){const t0=Date.now();try{await poll()}catch(e){}await new Promise(r=>setTimeout(r,Date.now()-t0<1500?2000:100))}},1000);
 A.bcol=v=>{C().bcol=v;save();applyTheme();render()};
