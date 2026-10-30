@@ -105,7 +105,7 @@ function seed(){return{mig:3,cfg:{pin:null,bio:true,autolock:30,screenSec:true,r
 let S,view="list",tab="chats",cur=null,q="",reply=null,locked=true,pin="",stage=0,first="",tries=0,until=0,hid=0;
 const C=()=>S.cfg,chat=()=>S.chats.find(c=>c.id===cur),last=c=>c.msgs.length?c.msgs[c.msgs.length-1].ts:0;
 function save(){try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){}}
-function load(){try{S=JSON.parse(localStorage.getItem(KEY))}catch(e){S=null}if(!S||!S.cfg)S=seed();S.cfg=Object.assign({bshape:"signal",bcol:"",inc:"plain",ts:"group",skin:"signal",twofa:false,idle:0,keyAlert:true,hidePrev:false,clipClear:false,keep:0},S.cfg);if(S.mig!==3){S.chats=S.chats.filter(c=>c.pub||c.id==="Note to Self");const n=S.chats.find(c=>c.id==="Note to Self");if(n&&n.msgs.length===1&&n.msgs[0].t.startsWith("Ideas:"))n.msgs=[];S.mig=3;save()}}
+function load(){try{S=JSON.parse(localStorage.getItem(KEY))}catch(e){S=null}if(!S||!S.cfg)S=seed();S.cfg=Object.assign({bshape:"signal",bcol:"",inc:"plain",ts:"group",skin:"signal",twofa:false,idle:0,keyAlert:true,hidePrev:false,clipClear:false,keep:0,servers:[],autoSwitch:true},S.cfg);if(S.mig!==3){S.chats=S.chats.filter(c=>c.pub||c.id==="Note to Self");const n=S.chats.find(c=>c.id==="Note to Self");if(n&&n.msgs.length===1&&n.msgs[0].t.startsWith("Ideas:"))n.msgs=[];S.mig=3;save()}}
 function applyTheme(){const r=document.documentElement;r.dataset.theme=C().theme==="system"?"":C().theme;r.style.setProperty("--acc",C().acc);r.style.setProperty("--fs",C().font+"px");const k=SK[C().skin]||SK.signal;r.style.setProperty("--rad",k.rad+"px");r.style.setProperty("--wall",k.wall||"var(--bg)");k.wall==="#000"?r.style.setProperty("--bg","#000"):r.style.removeProperty("--bg");document.body.style.fontFamily=k.f||"";r.style.setProperty("--bo",C().bcol||"var(--acc)");r.style.setProperty("--rad",({signal:18,soft:24,sharp:6})[C().bshape||"signal"]+"px");r.dataset.inc=C().inc||"plain"}
 function toast(t){const d=document.createElement("div");d.className="toast";d.textContent=t;document.body.append(d);setTimeout(()=>d.remove(),2400)}
 function sheet(t,items,html=""){const d=document.createElement("div");d.className="sh";d.innerHTML=`<div class="bx"><h4>${t}</h4>${html}${items.map((x,i)=>`<button data-i="${i}">${x[0]}</button>`).join("")}</div>`;d.onclick=e=>{const b=e.target.closest("button");if(b){d.remove();items[b.dataset.i][1]()}else if(e.target===d)d.remove()};document.body.append(d)}
@@ -143,7 +143,7 @@ return`<div class="pg">${upCard()}<div class="grp"><h3>Troubleshooting</h3>${act
 <div class="grp"><h3>Appearance</h3><div class="row" data-a="skins"><div><b>Style</b></div><small>${(SK[c.skin]||SK.signal).n}</small></div>${pk("theme","Theme")}${pk("font","Message size")}<div class="sw2">${ACC.map(a=>`<i data-a="acc" data-v="${a}" class="${c.acc===a?"on":""}" style="background:${a}"></i>`).join("")}</div></div>
 <div class="grp"><h3>Advanced security</h3>${tg("twofa","Fingerprint + PIN","Require both to unlock")}${pk("idle","Lock when idle")}${tg("keyAlert","Contact key change alerts","Warn if someone’s encryption key changes")}${tg("hidePrev","Hide message previews","Don’t show message text in the chat list")}${tg("clipClear","Clear clipboard after copying","Wipes copied text after 30 seconds")}${pk("keep","Delete old messages")}</div>
 <div class="grp"><h3>Chat bubbles</h3>${pk("bshape","Bubble shape")}${pk("inc","Incoming bubbles")}${pk("ts","Timestamps")}<div class="row" style="cursor:default"><div><b>Sent bubble colour</b></div></div><div class="sw2">${BC.map(x=>`<i data-a="bcol" data-v="${x}" class="${(c.bcol||"")===x?"on":""}" style="background:${x||c.acc}"></i>`).join("")}</div></div>
-<div class="grp"><h3>Network and updates</h3>${act("server","Server address",(c.server||"Not set")+(c.token&&online===false?" · offline":""))}${act("claim","Username",c.user?"@"+c.user:"Tap to choose")}</div>
+<div class="grp"><h3>Network and updates</h3>${act("server","Server address",(c.server||"Not set")+(c.token&&online===false?" · offline":""))}${act("servers","Servers",srvSummary())}${act("claim","Username",c.user?"@"+c.user:"Tap to choose")}</div>
 <div class="grp"><h3>Account</h3>${act("fp","Test fingerprint","Check that your fingerprint sensor works")}${act("pin","Change PIN","Set a new 4-digit PIN")}${act("lock","Lock now","Require PIN or fingerprint to reopen")}${act("resetnet","Reset server account","Remove your username and keys from this phone")}${act("panic","Panic wipe","Erase every chat, setting and PIN","dng")}</div><p class="hint">Quantum Signal v${VER}</p></div>`}
 function chatHTML(){const c=chat();return`<header class="ch"><button data-a="back" aria-label="Back">${ic("back")}</button><div class="who" data-a="info">${av(c.name,38)}<div><b>${E(c.name)}</b><small>${c.ver?"✓ Verified · ":""}${c.dis?"⏱ "+DL[c.dis]:"🔒 End-to-end encrypted"}</small></div></div><button data-a="cmenu" aria-label="More">${ic("more")}</button></header><div id="msgs"></div><div id="rp"></div><div class="bar"><input id="inp" placeholder="Message" autocomplete="off" ${C().incog?'autocorrect="off" spellcheck="false" autocapitalize="sentences"':""}><button class="snd" data-a="send" aria-label="Send">${ic("send")}</button></div>`}
 function renderMsgs(){const el=$("#msgs");if(!el||view!=="chat")return;const M=chat().msgs,mode=C().ts||"group";let h="",pd="";
@@ -191,11 +191,16 @@ document.addEventListener("input",e=>{if(e.target.id==="sq"){q=e.target.value;$(
 document.addEventListener("keydown",e=>{if(e.key==="Enter"&&e.target.id==="inp")send()});
 document.addEventListener("visibilitychange",()=>{if(document.hidden){hid=Date.now();if(C().screenSec)document.body.classList.add("priv")}else{document.body.classList.remove("priv");if(!locked&&C().pin&&(Date.now()-hid)/1000>=C().autolock){locked=true;pin="";render()}}});
 setInterval(()=>{const n=Date.now();let ch=0;if(!locked&&C().pin&&C().idle&&n-lastAct>C().idle*6e4){locked=true;pin="";render()}S.chats.forEach(c=>{const k=c.msgs.length;c.msgs=c.msgs.filter(m=>(!m.exp||m.exp>n)&&(!C().keep||n-m.ts<C().keep*864e5));if(c.msgs.length!==k)ch=1});if(ch&&!locked){save();view==="chat"?renderMsgs():render()}},1000);
-const VER="0.4.0";
+const VER="0.5.1";
 const SK={signal:{n:"Signal",acc:"#3a76f0",rad:18,wall:"",f:""},ios:{n:"iOS",acc:"#0a84ff",rad:20,wall:"",f:"-apple-system,BlinkMacSystemFont,'SF Pro Text',system-ui,sans-serif"},midnight:{n:"Midnight (OLED)",acc:"#8b5cf6",rad:16,wall:"#000",f:"",dark:1},aurora:{n:"Aurora",acc:"#14b8a6",rad:22,wall:"linear-gradient(160deg,#0f2027,#203a43,#2c5364)",f:"",dark:1},sunset:{n:"Sunset",acc:"#f97316",rad:20,wall:"linear-gradient(160deg,#fff1e6,#ffe0f0)",f:"",light:1}};
 /* End-to-end encryption: ECDH P-256 key agreement + AES-GCM. Server only ever sees ciphertext. */
 const Net={
-async j(p,o={}){const a=new AbortController(),tm=setTimeout(()=>a.abort(),1e4);try{const r=await fetch((C().server||"").replace(/\/$/,"")+p,{...o,signal:a.signal,headers:{"content-type":"application/json","x-token":C().token||""}});const d=await r.json().catch(()=>({}));if(!r.ok)throw new Error(d.e||("error "+r.status));return d}finally{clearTimeout(tm)}},
+async j(p,o={}){const list=Net.order();if(!list.length)throw new Error("no server set");let last;
+for(let i=0;i<list.length;i++){const u=list[i];
+try{const d=await Net.one(u,p,o);if(Net.cur&&Net.cur!==u&&SV[Net.cur]&&SV[Net.cur].up===false)toast("A server was down. Switched automatically.");SV[u]={...(SV[u]||{}),up:true,t:Date.now()};Net.cur=u;return d}
+catch(e){const net=e.name==="AbortError"||e instanceof TypeError||e.status>=500||e.status===429,soft=e.message==="auth"||(e.message==="not found"&&p.startsWith("/user/"));
+if(net){SV[u]={up:false,ms:0,t:Date.now()};logErr("failover",u.replace(/^https?:\/\//,"")+" unreachable")}last=e;if(!net&&!soft)throw e}}
+throw last},
 key:(j,priv)=>crypto.subtle.importKey("jwk",j,{name:"ECDH",namedCurve:"P-256"},false,priv?["deriveKey"]:[]),
 async shared(pub){return crypto.subtle.deriveKey({name:"ECDH",public:await Net.key(pub)},await Net.key(C().priv,1),{name:"AES-GCM",length:256},false,["encrypt","decrypt"])},
 async reg(u){const k=await crypto.subtle.generateKey({name:"ECDH",namedCurve:"P-256"},true,["deriveKey"]);const pub=await crypto.subtle.exportKey("jwk",k.publicKey),priv=await crypto.subtle.exportKey("jwk",k.privateKey);const d=await Net.j("/register",{method:"POST",body:JSON.stringify({u,pub})});Object.assign(C(),{user:u,token:d.token,pub,priv});save()},
@@ -212,9 +217,8 @@ async function tx(c,p){const e=await Net.enc(c.pub,JSON.stringify(p));await Net.
 const PERM=/not found|bad message|too large|auth|bad key|invalid|inbox full/i;
 async function relay(c,m){if(busy.has(m.id))return;busy.add(m.id);m.lt=Date.now();try{await tx(c,{k:"m",id:m.id,t:m.t,q:m.q||undefined});m.st=Math.max(m.st||0,1);delete m.err;delete m.perm}catch(x){const e=Net.msg(x);m.st=-1;m.err=e;m.tries=(m.tries||0)+1;m.perm=PERM.test(e)?1:0;logErr("send",e);if(m.tries===1)toast(m.perm?"Couldn’t send: "+(/auth/i.test(e)?"the server doesn’t recognise your account":e):"No connection. Will retry automatically.")}busy.delete(m.id);save();renderMsgs()}
 async function markRead(c){if(!c||!c.pub||!C().receipts||document.hidden||locked)return;const ids=c.msgs.filter(m=>!m.me&&!m.rs).map(m=>m.id);if(!ids.length)return;c.msgs.forEach(m=>{if(!m.me)m.rs=1});save();try{await tx(c,{k:"r",ids})}catch(e){c.msgs.forEach(m=>{if(ids.includes(m.id))m.rs=0})}}
-async function poll(){if(!C().token||locked)return;
-S.chats.forEach(c=>c.pub&&c.msgs.forEach(m=>{if(m.me&&m.st===-1&&!m.perm&&(m.tries||0)<12&&Date.now()-(m.lt||0)>Math.min(2e3*2**(m.tries||0),6e4))relay(c,m)}));
-try{const d=await Net.j("/inbox?u="+encodeURIComponent(C().user));online=true;const dl={};let bad=0;
+async function pollOnce(){if(!C().token||locked)return;
+try{const d=await Net.j("/inbox?u="+encodeURIComponent(C().user)+"&wait=25",{timeout:32000});online=true;const dl={};let bad=0;
 for(const e of d.m){let c=S.chats.find(x=>x.id===e.from);
 if(!c){try{c={id:e.from,name:e.from,msgs:[],dis:C().disap,ver:false,unread:0,pub:await Net.find(e.from)}}catch(x){bad++;continue}S.chats.push(c)}
 let p;try{const raw=await Net.dec(c.pub,e);try{p=JSON.parse(raw)}catch(x){}if(!p||!p.k)p={k:"m",id:uid(),t:raw}}catch(x){bad++;continue}
@@ -225,10 +229,32 @@ if(d.m.length){save();if(view==="chat")renderMsgs();else if(tab==="chats"&&docum
 if(bad)toast(bad+" message"+(bad>1?"s":"")+" couldn’t be decrypted");
 for(const k in dl)tx(dl[k].c,{k:"d",ids:dl[k].ids}).catch(()=>{});
 if(view==="chat")markRead(chat())}catch(e){online=false;logErr("poll",Net.msg(e));if(e.message==="auth"&&!authWarned){authWarned=true;toast("The server doesn’t recognise your account. Settings → Account → Reset server account.")}}}
-setInterval(poll,2000);
+function retryFailed(){if(!C().token||locked)return;S.chats.forEach(c=>c.pub&&c.msgs.forEach(m=>{if(m.me&&m.st===-1&&!m.perm&&(m.tries||0)<12&&Date.now()-(m.lt||0)>Math.min(2e3*2**(m.tries||0),6e4))relay(c,m)}));}
+setInterval(retryFailed,2000);
+let inPoll=false;async function poll(){if(inPoll)return;inPoll=true;try{await pollOnce()}finally{inPoll=false}}
+setTimeout(async()=>{while(true){const t0=Date.now();try{await poll()}catch(e){}await new Promise(r=>setTimeout(r,Date.now()-t0<1500?2000:100))}},1000);
 A.bcol=v=>{C().bcol=v;save();applyTheme();render()};
 const newer=(a,b)=>{const x=String(a).split(".").map(Number),y=String(b).split(".").map(Number);for(let i=0;i<3;i++)if((x[i]||0)!==(y[i]||0))return(x[i]||0)>(y[i]||0);return false};
 async function copy(t){try{await navigator.clipboard.writeText(t);return true}catch(e){try{const a=document.createElement("textarea");a.value=t;a.style.cssText="position:fixed;opacity:0";document.body.append(a);a.select();const ok=document.execCommand("copy");a.remove();return ok}catch(x){return false}}}
+const SV={};
+Object.assign(Net,{cur:null,
+async one(base,p,o){const a=new AbortController(),tm=setTimeout(()=>a.abort(),o.timeout||6e3);try{const r=await fetch(base.replace(/\/$/,"")+p,{...o,signal:a.signal,headers:{"content-type":"application/json","x-token":C().token||""}});const d=await r.json().catch(()=>({}));if(!r.ok)throw Object.assign(new Error(d.e||("error "+r.status)),{status:r.status});return d}finally{clearTimeout(tm)}},
+order(){const all=srvList();if(!all.length)return[];if(!C().autoSwitch)return[C().server||all[0]];const now=Date.now(),live=all.filter(u=>!SV[u]||SV[u].up!==false||now-SV[u].t>3e4),dead=all.filter(u=>!live.includes(u)),first=Net.cur&&live.includes(Net.cur)?Net.cur:live[0];return[first,...live.filter(u=>u!==first),...dead].filter(Boolean)}});
+const srvList=()=>[...new Set([C().server,...(C().servers||[])].filter(Boolean))];
+const okUrl=u=>typeof u==="string"&&/^https?:\/\//.test(u);
+function mergeServers(a){let ch=0;a.forEach(u=>{if(okUrl(u)&&!srvList().includes(u)){C().servers.push(u);ch=1}});if(!C().server&&C().servers.length)C().server=C().servers.shift();if(ch)save()}
+async function probe(){await Promise.all(srvList().map(async u=>{const a=new AbortController(),tm=setTimeout(()=>a.abort(),4e3),t=performance.now();try{const r=await fetch(u.replace(/\/$/,"")+"/health",{signal:a.signal});if(!r.ok)throw 0;await r.json();SV[u]={up:true,ms:Math.round(performance.now()-t),t:Date.now()}}catch(e){SV[u]={up:false,ms:0,t:Date.now()}}finally{clearTimeout(tm)}}));choose()}
+function choose(){if(!C().autoSwitch)return;const up=srvList().filter(u=>SV[u]&&SV[u].up);if(!up.length)return;const best=Math.min(...up.map(u=>SV[u].ms)),near=up.filter(u=>SV[u].ms<=best*1.5+40);if(!Net.cur||!near.includes(Net.cur))Net.cur=near[Math.floor(Math.random()*near.length)]}
+async function discover(){try{const d=await Net.j("/servers");if(Array.isArray(d.all))mergeServers(d.all)}catch(e){}}
+function srvSummary(){const L=srvList();return L.length+" server"+(L.length===1?"":"s")+(L.length>1?" · "+L.filter(u=>SV[u]&&SV[u].up).length+" online":"")+" · auto-switch "+(C().autoSwitch?"on":"off")}
+const host=u=>u.replace(/^https?:\/\//,"");
+function srvMenu(u){sheet(E(host(u)),[["Use this server now",()=>{Net.cur=u;toast("Using "+host(u))}],["Remove from list",()=>{C().servers=C().servers.filter(x=>x!==u);if(C().server===u)C().server=C().servers.shift()||"";save();render()}]])}
+A.servers=()=>{const L=srvList(),dot=u=>SV[u]?SV[u].up?"🟢":"🔴":"⚪";
+sheet("Servers",[...L.map(u=>[dot(u)+" "+E(host(u))+(SV[u]&&SV[u].up?" · "+SV[u].ms+" ms":"")+(u===Net.cur?" · in use":""),()=>srvMenu(u)]),
+["➕ Add a server",()=>ask("Add a server","http://address:3000",v=>{if(!v)return;v=okUrl(v)?v:"http://"+v;if(!srvList().includes(v)){C().servers.push(v);save()}probe().then(render)})],
+["Auto-switch: "+(C().autoSwitch?"on":"off")+" (tap to change)",()=>{C().autoSwitch=!C().autoSwitch;save();render()}],
+["Test all now",async()=>{toast("Testing servers…");await probe();A.servers()}]],'<p class="hint">Messages use the fastest working server and switch automatically if one goes down. Servers in the same cluster share accounts and messages.</p>')};
+setTimeout(()=>{if(srvList().length)probe()},800);setInterval(()=>{if(srvList().length)probe()},3e4);setInterval(discover,6e4);setTimeout(discover,1500);
 const ERR=[];let authWarned=false,lastAct=Date.now();
 function logErr(w,m){ERR.push({t:Date.now(),w,m:String(m&&m.message||m).slice(0,160)});if(ERR.length>30)ERR.shift()}
 addEventListener("error",e=>logErr("js",(e.message||"error")+(e.lineno?" (line "+e.lineno+")":"")));
@@ -266,6 +292,7 @@ if(!Bio.native()&&location.protocol==="https:"&&/^http:/.test(cfg.server)&&!/127
 try{const h=await Net.j("/health");up=true;add("ok","Server reachable",h.users+" account"+(h.users===1?"":"s"))}catch(e){add("bad","Server not reachable",Net.msg(e)+". Check the server is running and the address "+cfg.server+" is right.")}
 if(up&&cfg.token){try{const p=await Net.find(cfg.user);cfg.pub&&p.x===cfg.pub.x&&p.y===cfg.pub.y?add("ok","Your account is registered","@"+cfg.user):(add("bad","Account keys don’t match the server","Someone may have taken @"+cfg.user+", or the server was reset."),reset=1)}catch(e){e.message==="not found"?(add("bad","Your username isn’t on this server","The server data was reset."),reset=1):add("warn","Couldn’t verify your account",Net.msg(e))}}
 else if(up)add("warn","No username yet","Choose one in Settings → Network and updates.")}
+if(srvList().length>1){await probe();const n=srvList().length,u=srvList().filter(x=>SV[x]&&SV[x].up).length;add(u===n?"ok":u?"warn":"bad","Servers online: "+u+" of "+n,u===n?"Messages switch automatically if one goes down.":"Down: "+srvList().filter(x=>!(SV[x]&&SV[x].up)).map(x=>x.replace(/^https?:\/\//,"")).join(", "))}
 UP.s==="avail"?add("warn","Update available","v"+UP.v+". Tap Update now at the top of Settings."):UP.s==="error"?add("warn","Couldn’t check for updates"):add("ok","App is up to date");
 ERR.length?add("warn",ERR.length+" error"+(ERR.length>1?"s":"")+" logged this session",ERR.slice(-3).map(e=>e.w+": "+e.m).join(" · ")):add("ok","No errors logged");
 save();if(!locked)render();if(cfg.token)poll();
@@ -278,8 +305,8 @@ sheet("Error check",items,html)}
 function ask(t,ph,cb,extra=[]){window._u="";sheet(t,[["Save",()=>cb(window._u.trim().toLowerCase()===window._u.trim()?window._u.trim():window._u.trim())],...extra],`<div style="padding:4px 16px"><input class="srch" style="margin:0;width:100%;box-sizing:border-box" placeholder="${ph}" ${ph==="Current PIN"?'type="password" inputmode="numeric" maxlength="4"':""} autocapitalize="none" autocomplete="off" oninput="window._u=this.value"></div>`)}
 Object.assign(A,{
 newchat(){ask("Find by username","username",async v=>{const u=v.toLowerCase();if(!C().token)return toast("Choose a username in Settings first");if(u===C().user)return toast("That’s your own username");try{const pub=await Net.find(u);if(!S.chats.some(c=>c.id===u))S.chats.push({id:u,name:u,msgs:[],dis:C().disap,ver:false,unread:0,pub});save();A.open(u)}catch(e){toast(e.message==="not found"?"No user “"+u+"” found":"Couldn’t search: "+Net.msg(e))}})},
-server(){ask("Server address","http://YOUR_IP:3000",v=>{C().server=v&&!/^https?:\/\//.test(v)?"http://"+v:v;save();render()})},
-claim(){ask("Choose a username","3–20 letters, numbers or _",async v=>{if(!C().server)return toast("Set the server address first");try{await Net.reg(v.toLowerCase());toast("You are @"+v.toLowerCase());render()}catch(e){toast(e.message==="taken"?"That username is taken":"Could not register: "+Net.msg(e))}})},
+server(){ask("Server address","http://YOUR_IP:3000",v=>{C().server=v&&!/^https?:\/\//.test(v)?"http://"+v:v;save();render();discover()})},
+claim(){ask("Choose a username","3–20 letters, numbers or _",async v=>{if(!C().server)return toast("Set the server address first");try{await Net.reg(v.toLowerCase());discover();toast("You are @"+v.toLowerCase());render()}catch(e){toast(e.message==="taken"?"That username is taken":"Could not register: "+Net.msg(e))}})},
 skins(){sheet("Style",Object.entries(SK).map(([k,x])=>[x.n,()=>{C().skin=k;C().acc=x.acc;C().theme=x.dark?"dark":x.light?"light":"system";save();applyTheme();render()}]))},
 async upd(s){try{const d=await(await fetch("version.json?"+Date.now(),{cache:"no-store"})).json();if(d.version===VER){if(!s)toast("You’re up to date (v"+VER+")");return}
 sheet("Update available · v"+d.version,[["Update now",async()=>{try{for(const k of await caches.keys())await caches.delete(k)}catch(e){}location.replace(location.pathname+"?v="+d.version)}]],`<p class="hint">${E(d.notes||"")}</p>`)}catch(e){if(!s)toast("In-app updates work in the hosted app")}}});
@@ -287,7 +314,7 @@ let UP={s:"idle",v:"",notes:""};
 const rs=()=>{if(!locked&&view==="list"&&tab==="set")render()};
 const upCard=()=>{const a=UP.s;return`<div class="upc ${a}"><div><b>${a==="avail"?"Update available · v"+E(UP.v):a==="checking"?"Checking for updates…":a==="applying"?"Installing update…":a==="latest"?"You’re up to date":a==="error"?"Couldn’t check for updates":"Quantum Signal v"+VER}</b><small>${a==="avail"?E(UP.notes||"A new version is ready."):a==="error"?"Updates work in the installed or hosted app.":"Version "+VER}</small></div><button data-a="updgo">${a==="avail"?"Update now":a==="checking"?"Checking…":a==="applying"?"Updating…":"Check again"}</button></div>`};
 async function chkUp(){if(UP.s==="checking"||UP.s==="applying")return;const was=UP.s;UP.s="checking";rs();
-try{const d=await(await fetch("version.json?"+Date.now(),{cache:"no-store"})).json();if(!d.version)throw 0;if(d.server&&!C().token&&C().server!==d.server){C().server=d.server;save()}
+try{const d=await(await fetch("version.json?"+Date.now(),{cache:"no-store"})).json();if(!d.version)throw 0;if(d.server&&!C().token&&C().server!==d.server){C().server=d.server;save()}if(Array.isArray(d.servers))mergeServers(d.servers);
 if(!newer(d.version,VER))UP.s="latest";else{UP={s:"avail",v:String(d.version),notes:d.notes||""};if(was!=="avail")toast("Update available: v"+UP.v)}}catch(e){UP.s="error"}rs();if(!locked&&view==="list"&&tab==="chats")render()}
 async function applyUp(){UP.s="applying";rs();toast("Downloading update…");try{for(const k of await caches.keys())await caches.delete(k)}catch(e){}location.replace(location.pathname+"?v="+UP.v+"&t="+Date.now())}
 A.updgo=()=>UP.s==="avail"?applyUp():chkUp();
