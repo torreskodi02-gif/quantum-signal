@@ -34,6 +34,12 @@ SIZE=$(du -h "$SITE/quantum-signal.apk" | cut -f1); SUM=$(sha256sum "$SITE/quant
 SHA=$(gh run list --workflow build-apk.yml --status success --limit 1 --json headSha -q '.[0].headSha' 2>/dev/null | cut -c1-7)
 V=$(grep -o '"version":"[^"]*"' www/version.json 2>/dev/null | cut -d'"' -f4)
 echo "Got it from $SRC ($SIZE)"
+CFG=$(unzip -p "$SITE/quantum-signal.apk" assets/capacitor.config.json 2>/dev/null)
+if echo "$CFG" | grep -q 'github.io'; then
+  LIVE="This build loads the app live from GitHub, so every GitHub update reaches it automatically."; echo "Checked inside the APK: it loads the app live from GitHub. Good."
+else
+  LIVE="WARNING: this build has the app saved inside it and will NOT update from GitHub."; echo "WARNING: this APK has a saved copy of the app inside and will not update from GitHub."
+fi
 
 say "2/4 Building the page"
 cat > "$SITE/index.html" <<HTML
@@ -45,7 +51,7 @@ a.btn{display:block;text-align:center;background:#3a76f0;color:#fff;text-decorat
 small,li{color:#888}code{font-size:.85em}</style></head><body>
 <h1>Quantum Signal</h1><p>Private messenger for Android.</p>
 <a class="btn" href="quantum-signal.apk" download>Download the app ($SIZE)</a>
-<div class="card"><b>This build</b><br><small>App version $V<br>Built from commit ${SHA:-unknown}<br>Page updated $(date '+%Y-%m-%d %H:%M')<br>Checksum <code>$SUM</code></small></div>
+<div class="card"><b>This build</b><br><small>App version $V<br>Built from commit ${SHA:-unknown}<br>Page updated $(date '+%Y-%m-%d %H:%M')<br>$LIVE<br>Checksum <code>$SUM</code></small></div>
 <div class="card"><b>Installing</b><ol><li>Open the downloaded file.</li><li>If Android asks, allow installs from this browser.</li><li>If it says "App not installed", uninstall any older Quantum Signal first, then try again.</li></ol></div>
 </body></html>
 HTML

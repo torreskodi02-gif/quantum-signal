@@ -14,6 +14,7 @@ say "Where this phone pushes to"
 URL=$(git remote get-url origin 2>/dev/null); echo "  $URL"
 REPO=$(gh repo view --json nameWithOwner -q .nameWithOwner 2>/dev/null)
 [ -n "$REPO" ] && ok "GitHub repo: $REPO" || bad "Can't reach the GitHub repo. Run: gh auth status"
+OWNER=${REPO%%/*}; NAME=${REPO##*/}
 BR=$(git rev-parse --abbrev-ref HEAD 2>/dev/null); echo "  Branch: $BR"
 git fetch -q origin 2>/dev/null
 
@@ -33,6 +34,8 @@ if [ -n "$STRAY" ]; then bad "These files should not be on GitHub:"; echo "$STRA
   else echo "    Run: bash repo-check.sh --fix"; fi
 else ok "No stray files"; fi
 [ -f www/index.html ] && ok "App files are in www/" || bad "www/index.html is missing from this folder"
+if [ -f capacitor.config.json ] && grep -q "https://$OWNER.github.io/$NAME/" capacitor.config.json; then ok "The Android app is set to load live from https://$OWNER.github.io/$NAME/"
+else bad "capacitor.config.json is missing or not pointing at https://$OWNER.github.io/$NAME/ . APKs built from it would hold a saved copy and never update."; fi
 
 say "Does GitHub's copy match this phone?"
 LOCALV=$(grep -o '"version":"[^"]*"' www/version.json | cut -d'"' -f4)
