@@ -87,6 +87,12 @@ body.priv::after{content:"Quantum Signal";position:fixed;inset:0;background:var(
 .upc.checking button,.upc.applying button{opacity:.55;pointer-events:none}
 .dg{padding:8px 16px}.dg b{display:block;font-weight:600}.dg.ok b{color:#1f9d6b}.dg.warn b{color:#e08a1e}.dg.bad b{color:#d92d20}.dg small{display:block;margin-top:2px;line-height:1.35}
 .rbtn{background:var(--acc);color:#fff;border-radius:22px;padding:12px 24px;font-weight:600;margin-top:10px}
+.auth{flex:1;display:flex;flex-direction:column;justify-content:center;gap:10px;padding:24px;width:100%;max-width:420px;margin:0 auto;box-sizing:border-box;text-align:center}
+.auth .logo{margin:0 auto 6px}.auth h2{margin:0;font-size:26px}.auth .sub{margin:0 0 10px;color:var(--mu)}
+.tabs{display:flex;background:var(--sf);border-radius:14px;padding:4px;margin-bottom:4px}.tabs button{flex:1;border-radius:11px;padding:10px;font-weight:600;color:var(--mu)}.tabs button.on{background:var(--bg);color:var(--tx);box-shadow:0 1px 4px #0002}
+.fi{padding:14px 16px;border-radius:14px;border:1px solid var(--ln);background:var(--sf);color:var(--tx);font:inherit;font-size:16px;width:100%;box-sizing:border-box}
+.err{color:#d92d20;min-height:1.3em;font-size:14px;margin:0}.rbtn.wide{width:100%;padding:14px;margin-top:0}.rbtn:disabled{opacity:.6}
+.sv a{color:var(--acc);cursor:pointer;margin-left:6px}
 </style></head><body><div id="app"></div>
 <script>
 const $=s=>document.querySelector(s),KEY="qs_v1";
@@ -126,7 +132,7 @@ if(C().cred){await navigator.credentials.get({publicKey:{challenge:ch,allowCrede
 const c=await navigator.credentials.create({publicKey:{challenge:ch,rp:{name:"Quantum Signal"},user:{id:ch.slice(0,16),name:"me",displayName:"Me"},pubKeyCredParams:[{type:"public-key",alg:-7},{type:"public-key",alg:-257}],authenticatorSelection:{authenticatorAttachment:"platform",userVerification:"required"},timeout:60000}});
 C().cred=b64e(c.rawId);save();return true}catch(e){Bio.err=Bio.say(e);return false}}};
 /* Render */
-function render(){const a=$("#app");try{if(locked)a.innerHTML=lockHTML();else if(view==="chat"){a.innerHTML=chatHTML();renderMsgs()}else a.innerHTML=listHTML()}catch(e){logErr("render",e);view="list";tab="chats";a.innerHTML='<div class="lock"><div class="logo">!</div><h2>Something went wrong</h2><p>This screen couldn’t be drawn. Tap below to scan and repair.</p><button class="rbtn" data-a="debug">Run repair</button></div>'}}
+function render(){const a=$("#app");try{if(!C().user||!C().token)a.innerHTML=authHTML();else if(locked)a.innerHTML=lockHTML();else if(view==="chat"){a.innerHTML=chatHTML();renderMsgs()}else a.innerHTML=listHTML()}catch(e){logErr("render",e);view="list";tab="chats";a.innerHTML='<div class="lock"><div class="logo">!</div><h2>Something went wrong</h2><p>This screen couldn’t be drawn. Tap below to scan and repair.</p><button class="rbtn" data-a="debug">Run repair</button></div>'}}
 function lockHTML(){const c=C(),mk=!c.pin;return`<div class="lock"><div class="logo">${ic("lock",34)}</div><h2>${mk?(stage?"Confirm your PIN":"Create a 4-digit PIN"):"Unlock Quantum Signal"}</h2><p id="lm">${mk?"Your PIN protects the app on this device":(c.twofa&&c.bio?"Enter your PIN, then scan your fingerprint":"Enter your PIN or use your fingerprint")}</p><div class="dots">${[0,1,2,3].map(i=>`<i class="${i<pin.length?"f":""}"></i>`).join("")}</div><div class="pad">${[1,2,3,4,5,6,7,8,9].map(n=>`<button data-a="key" data-v="${n}">${n}</button>`).join("")}<button data-a="bio" aria-label="Fingerprint" ${c.bio&&c.pin&&!c.twofa?"":"disabled"}>${ic("fp",30)}</button><button data-a="key" data-v="0">0</button><button data-a="key" data-v="x" aria-label="Delete">⌫</button></div></div>`}
 function rows(){const l=S.chats.filter(c=>c.name.toLowerCase().includes(q.toLowerCase())).sort((a,b)=>last(b)-last(a));return l.map(c=>{const m=c.msgs[c.msgs.length-1];return`<div class="it" data-a="open" data-v="${E(c.id)}">${av(c.name,48)}<div class="m"><b>${E(c.name)}${c.ver?" ✓":""}</b><span>${m?(C().hidePrev?"Message":(m.me?"You: ":"")+E(m.t)):"No messages yet"}</span></div><div class="r">${m?fday(m.ts):""}${c.dis?"⏱":""}${c.unread?`<i class="bd">${c.unread}</i>`:""}</div></div>`}).join("")+(S.chats.length<2&&!q?'<p class="hint">Tap the pencil to find someone by username and start an encrypted chat.</p>':"")||'<p class="hint">No chats found.</p>'}
 function listHTML(){const T={chats:"Quantum Signal",calls:"Calls",set:"Settings"};
@@ -143,8 +149,8 @@ return`<div class="pg">${upCard()}<div class="grp"><h3>Troubleshooting</h3>${act
 <div class="grp"><h3>Appearance</h3><div class="row" data-a="skins"><div><b>Style</b></div><small>${(SK[c.skin]||SK.signal).n}</small></div>${pk("theme","Theme")}${pk("font","Message size")}<div class="sw2">${ACC.map(a=>`<i data-a="acc" data-v="${a}" class="${c.acc===a?"on":""}" style="background:${a}"></i>`).join("")}</div></div>
 <div class="grp"><h3>Advanced security</h3>${tg("twofa","Fingerprint + PIN","Require both to unlock")}${pk("idle","Lock when idle")}${tg("keyAlert","Contact key change alerts","Warn if someone’s encryption key changes")}${tg("hidePrev","Hide message previews","Don’t show message text in the chat list")}${tg("clipClear","Clear clipboard after copying","Wipes copied text after 30 seconds")}${pk("keep","Delete old messages")}</div>
 <div class="grp"><h3>Chat bubbles</h3>${pk("bshape","Bubble shape")}${pk("inc","Incoming bubbles")}${pk("ts","Timestamps")}<div class="row" style="cursor:default"><div><b>Sent bubble colour</b></div></div><div class="sw2">${BC.map(x=>`<i data-a="bcol" data-v="${x}" class="${(c.bcol||"")===x?"on":""}" style="background:${x||c.acc}"></i>`).join("")}</div></div>
-<div class="grp"><h3>Network and updates</h3>${act("server","Server address",(c.server||"Not set")+(c.token&&online===false?" · offline":""))}${act("servers","Servers",srvSummary())}${c.server!==CF?act("usecf","Use Cloudflare for messages","Move your account to your Cloudflare server"):""}${act("claim","Username",c.user?"@"+c.user:"Tap to choose")}</div>
-<div class="grp"><h3>Account</h3>${act("fp","Test fingerprint","Check that your fingerprint sensor works")}${act("pin","Change PIN","Set a new 4-digit PIN")}${act("lock","Lock now","Require PIN or fingerprint to reopen")}${act("resetnet","Reset server account","Remove your username and keys from this phone")}${act("panic","Panic wipe","Erase every chat, setting and PIN","dng")}</div><p class="hint">Quantum Signal v${VER}</p></div>`}
+<div class="grp"><h3>Network and updates</h3>${act("server","Server address",(c.server||"Not set")+(c.token&&online===false?" · offline":""))}${act("servers","Servers",srvSummary())}${c.server!==CF?act("usecf","Use Cloudflare for messages","Move your account to your Cloudflare server"):""}</div>
+<div class="grp"><h3>Account</h3>${act("fp","Test fingerprint","Check that your fingerprint sensor works")}${act("pin","Change PIN","Set a new 4-digit PIN")}${act("lock","Lock now","Require PIN or fingerprint to reopen")}${act("pw",c.hasPw?"Change password":"Add a password",c.hasPw?"Update the password you log in with":"So you can log in on another phone")}${act("logout","Log out","Remove this account from this phone")}${act("resetnet","Reset server account","Remove your username and keys from this phone")}${act("panic","Panic wipe","Erase every chat, setting and PIN","dng")}</div><p class="hint">Quantum Signal v${VER}</p></div>`}
 function chatHTML(){const c=chat();return`<header class="ch"><button data-a="back" aria-label="Back">${ic("back")}</button><div class="who" data-a="info">${av(c.name,38)}<div><b>${E(c.name)}</b><small>${c.ver?"✓ Verified · ":""}${c.dis?"⏱ "+DL[c.dis]:"🔒 End-to-end encrypted"}</small></div></div><button data-a="cmenu" aria-label="More">${ic("more")}</button></header><div id="msgs"></div><div id="rp"></div><div class="bar"><input id="inp" placeholder="Message" autocomplete="off" ${C().incog?'autocorrect="off" spellcheck="false" autocapitalize="sentences"':""}><button class="snd" data-a="send" aria-label="Send">${ic("send")}</button></div>`}
 function renderMsgs(){const el=$("#msgs");if(!el||view!=="chat")return;const M=chat().msgs,mode=C().ts||"group";let h="",pd="";
 M.forEach((m,i)=>{const p=M[i-1],n=M[i+1],d=new Date(m.ts).toDateString();if(d!==pd){h+=`<div class="day">${dayLbl(m.ts)}</div>`;pd=d}
@@ -188,10 +194,10 @@ resetnet(){sheet("Reset server account?",[["Reset account",()=>{Object.assign(C(
 panic(){sheet("Wipe all data?",[["Yes, wipe everything now",wipe]],'<p class="hint">Deletes every chat, setting and your PIN from this device.</p>')}};
 document.addEventListener("click",e=>{const el=e.target.closest("[data-a]");if(el&&A[el.dataset.a])A[el.dataset.a](el.dataset.v)});
 document.addEventListener("input",e=>{if(e.target.id==="sq"){q=e.target.value;$("#cl").innerHTML=rows()}});
-document.addEventListener("keydown",e=>{if(e.key==="Enter"&&e.target.id==="inp")send()});
+document.addEventListener("keydown",e=>{if(e.key==="Enter"&&e.target.id==="inp")send();if(e.key==="Enter"&&["au","ap","ap2"].includes(e.target.id))A.authgo()});
 document.addEventListener("visibilitychange",()=>{if(document.hidden){hid=Date.now();if(C().screenSec)document.body.classList.add("priv")}else{document.body.classList.remove("priv");if(!locked&&C().pin&&(Date.now()-hid)/1000>=C().autolock){locked=true;pin="";render()}}});
 setInterval(()=>{const n=Date.now();let ch=0;if(!locked&&C().pin&&C().idle&&n-lastAct>C().idle*6e4){locked=true;pin="";render()}S.chats.forEach(c=>{const k=c.msgs.length;c.msgs=c.msgs.filter(m=>(!m.exp||m.exp>n)&&(!C().keep||n-m.ts<C().keep*864e5));if(c.msgs.length!==k)ch=1});if(ch&&!locked){save();view==="chat"?renderMsgs():render()}},1000);
-const VER="0.6.2";
+const VER="0.7.0";
 const SK={signal:{n:"Signal",acc:"#3a76f0",rad:18,wall:"",f:""},ios:{n:"iOS",acc:"#0a84ff",rad:20,wall:"",f:"-apple-system,BlinkMacSystemFont,'SF Pro Text',system-ui,sans-serif"},midnight:{n:"Midnight (OLED)",acc:"#8b5cf6",rad:16,wall:"#000",f:"",dark:1},aurora:{n:"Aurora",acc:"#14b8a6",rad:22,wall:"linear-gradient(160deg,#0f2027,#203a43,#2c5364)",f:"",dark:1},sunset:{n:"Sunset",acc:"#f97316",rad:20,wall:"linear-gradient(160deg,#fff1e6,#ffe0f0)",f:"",light:1}};
 /* End-to-end encryption: ECDH P-256 key agreement + AES-GCM. Server only ever sees ciphertext. */
 const Net={
@@ -266,9 +272,45 @@ function offerCF(){if(locked||!C().token||C().server===CF||S.cfAsked)return;S.cf
 sheet("Use your Cloudflare server?",[["Yes, move my account",()=>A.usecf()],["Not now",()=>{}]],'<p class="hint">Your messages would go through your own Cloudflare server. It runs 24/7 with no phone or IP address needed. Your username and keys move with you.</p>')}
 A.usecf=async()=>{const old={server:C().server,servers:[...(C().servers||[])]};toast("Moving to Cloudflare…");
 C().server=CF;C().servers=[];Net.cur=null;delete SV[CF];
-try{if(C().user&&C().pub){const d=await Net.j("/register",{method:"POST",body:JSON.stringify({u:C().user,pub:C().pub})});C().token=d.token;S.ack=[];toast("Done. You are @"+C().user+" on Cloudflare.")}else toast("Using Cloudflare. Choose a username to finish.")}
+try{if(C().user&&C().pub){const d=await Net.j("/register",{method:"POST",body:JSON.stringify({u:C().user,pub:C().pub})});C().token=d.token;C().hasPw=false;S.ack=[];toast("Done. You are @"+C().user+" on Cloudflare.")}else toast("Using Cloudflare.")}
 catch(e){if(e.message==="taken"){toast("@"+C().user+" already exists on Cloudflare. Tap Reset server account, then choose a name.")}else{Object.assign(C(),old);toast("Couldn’t reach Cloudflare: "+Net.msg(e))}}
 restartPoll();save();render();probe()};
+/* ---- account: username + password login. The password never leaves the phone: it only unlocks your encryption key. ---- */
+const enc=s=>new TextEncoder().encode(s),hx=b=>[...new Uint8Array(b)].map(x=>x.toString(16).padStart(2,"0")).join("");
+async function kdf(u,pw){const k=await crypto.subtle.importKey("raw",enc(pw.normalize("NFKC")),"PBKDF2",false,["deriveBits"]),bits=await crypto.subtle.deriveBits({name:"PBKDF2",hash:"SHA-256",salt:enc("qs-v1:"+u),iterations:6e5},k,512);return{auth:hx(bits.slice(0,32)),key:await crypto.subtle.importKey("raw",bits.slice(32),"AES-GCM",false,["encrypt","decrypt"])}}
+async function seal(jwk,key){const iv=crypto.getRandomValues(new Uint8Array(12));return{iv:b64e(iv),ct:b64e(await crypto.subtle.encrypt({name:"AES-GCM",iv},key,enc(JSON.stringify(jwk))))}}
+async function unseal(v,key){return JSON.parse(new TextDecoder().decode(await crypto.subtle.decrypt({name:"AES-GCM",iv:b64d(v.iv)},key,b64d(v.ct))))}
+const noteChat=()=>({id:"Note to Self",name:"Note to Self",msgs:[],dis:0,ver:false,unread:0});
+function adopt(o){if(C().user&&C().user!==o.user)S.chats=[noteChat()];Object.assign(C(),o);S.ack=[];save();restartPoll();discover()}
+Object.assign(Net,{
+async signup(u,pw){const k=await crypto.subtle.generateKey({name:"ECDH",namedCurve:"P-256"},true,["deriveKey"]),pub=await crypto.subtle.exportKey("jwk",k.publicKey),priv=await crypto.subtle.exportKey("jwk",k.privateKey),d0=await kdf(u,pw),d=await Net.j("/register",{method:"POST",body:JSON.stringify({u,pub,auth:d0.auth,vault:await seal(priv,d0.key)})});adopt({user:u,token:d.token,pub,priv,hasPw:true})},
+async login(u,pw){const d0=await kdf(u,pw),d=await Net.j("/login",{method:"POST",body:JSON.stringify({u,auth:d0.auth})});let priv;try{priv=await unseal(d.vault,d0.key)}catch(e){throw new Error("login")}if(priv.x!==d.pub.x||priv.y!==d.pub.y)throw new Error("login");adopt({user:u,token:d.token,pub:d.pub,priv,hasPw:true})}});
+let authTab="login",authUser="",authBusy=false;
+function authHTML(){const su=authTab==="signup";return`<div class="auth"><div class="logo">${ic("lock",34)}</div><h2>Quantum Signal</h2><p class="sub">Private messages, end-to-end encrypted</p>
+<div class="tabs"><button data-a="authtab" data-v="login" class="${su?"":"on"}">Log in</button><button data-a="authtab" data-v="signup" class="${su?"on":""}">Create account</button></div>
+<input id="au" class="fi" placeholder="Username" value="${E(authUser)}" autocomplete="username" autocapitalize="none" autocorrect="off" spellcheck="false" maxlength="20">
+<input id="ap" class="fi" type="password" placeholder="Password" autocomplete="${su?"new-password":"current-password"}">
+${su?'<input id="ap2" class="fi" type="password" placeholder="Confirm password" autocomplete="new-password"><small>At least 8 characters. Your password never leaves this phone. It only unlocks your encryption key.</small>':""}
+<p id="aerr" class="err" role="alert"></p>
+<button class="rbtn wide" data-a="authgo" ${authBusy?"disabled":""}>${authBusy?"Please wait…":su?"Create account":"Log in"}</button>
+<small class="sv">Server: ${E(host(C().server||"none"))} <a data-a="srvset">Change</a></small></div>`}
+const authErr=e=>e.message==="taken"?"That username is taken":e.message==="login"?"Wrong username or password":e.message==="too many attempts"?"Too many attempts. Wait 15 minutes and try again":e.message==="too many sign-ups"?"Too many sign-ups from this network. Try later":e.name==="AbortError"||e instanceof TypeError||/no server/.test(e.message)?"Can’t reach the server. Check your connection":Net.msg(e);
+function form(title,fields,go){window._f=[];sheet(title,[["Save",()=>go(...fields.map((_,i)=>window._f[i]||""))]],fields.map((f,i)=>`<div style="padding:4px 16px"><input class="srch" style="margin:0;width:100%;box-sizing:border-box" type="password" placeholder="${f}" autocomplete="off" oninput="_f[${i}]=this.value"></div>`).join(""))}
+Object.assign(A,{
+authtab(v){authUser=($("#au")||{}).value||authUser;authTab=v;render()},
+srvset(){authUser=($("#au")||{}).value||authUser;A.server()},
+async authgo(){if(authBusy)return;const u=(($("#au")||{}).value||"").trim().toLowerCase(),pw=($("#ap")||{}).value||"",su=authTab==="signup",err=m=>{const e=$("#aerr");if(e)e.textContent=m};authUser=u;
+if(!/^[a-z0-9_]{3,20}$/.test(u))return err("Username: 3 to 20 letters, numbers or _");
+if(su){if(pw.length<8)return err("Password needs at least 8 characters");if(pw===u)return err("Password can’t be the same as your username");if(pw!==($("#ap2")||{}).value)return err("The two passwords don’t match")}else if(!pw)return err("Enter your password");
+authBusy=true;err("");const b=document.querySelector("[data-a=authgo]");if(b){b.disabled=true;b.textContent="Please wait…"}
+try{await(su?Net.signup(u,pw):Net.login(u,pw));authBusy=false;locked=!C().pin;view="list";tab="chats";render();toast(su?"Account created":"Welcome back, @"+u)}
+catch(e){authBusy=false;logErr("auth",e);const m=authErr(e);render();const el=$("#aerr");if(el)el.textContent=m}},
+pw(){const has=!!C().hasPw;form(has?"Change password":"Add a password",has?["Current password","New password (8+ characters)","Confirm new password"]:["New password (8+ characters)","Confirm password"],async(...v)=>{const[old,n1,n2]=has?v:["",v[0],v[1]];
+if(n1.length<8)return toast("New password needs at least 8 characters");if(n1!==n2)return toast("The new passwords don’t match");
+try{toast("Saving…");const u=C().user,n=await kdf(u,n1),body={u,auth:n.auth,vault:await seal(C().priv,n.key)};if(has)body.old=(await kdf(u,old)).auth;await Net.j("/password",{method:"POST",body:JSON.stringify(body)});C().hasPw=true;save();render();toast("Password saved")}
+catch(e){toast(e.message==="login"?"Current password is wrong":e.message==="too many attempts"?"Too many attempts. Try again later":"Couldn’t save: "+Net.msg(e))}})},
+logout(){if(!C().hasPw)return toast("Add a password first, or you won’t be able to log back in");
+sheet("Log out?",[["Log out and erase this phone’s chats",async()=>{try{await Net.j("/logout",{method:"POST",body:JSON.stringify({u:C().user})})}catch(e){}Object.assign(C(),{user:null,token:null,pub:null,priv:null,hasPw:false});S.chats=[noteChat()];S.ack=[];save();restartPoll();locked=false;view="list";tab="chats";authTab="login";render()}]],'<p class="hint">Messages already delivered to this phone are erased. Log in again with your password to get your account back here or on another phone. Past messages can’t be restored.</p>')}});
 const ERR=[];let authWarned=false,lastAct=Date.now();
 function logErr(w,m){ERR.push({t:Date.now(),w,m:String(m&&m.message||m).slice(0,160)});if(ERR.length>30)ERR.shift()}
 addEventListener("error",e=>logErr("js",(e.message||"error")+(e.lineno?" (line "+e.lineno+")":"")));
@@ -306,7 +348,7 @@ else{let up=false;
 if(!Bio.native()&&location.protocol==="https:"&&/^http:/.test(cfg.server)&&!/127\.0\.0\.1|localhost/.test(cfg.server))add("warn","Browsers block http servers on https pages","Use the installed app, or put the server behind HTTPS.");
 try{const h=await Net.j("/health");up=true;add("ok","Server reachable",h.users+" account"+(h.users===1?"":"s"))}catch(e){add("bad","Server not reachable",Net.msg(e)+". Check the server is running and the address "+cfg.server+" is right.")}
 if(up&&cfg.token){try{const p=await Net.find(cfg.user);cfg.pub&&p.x===cfg.pub.x&&p.y===cfg.pub.y?add("ok","Your account is registered","@"+cfg.user):(add("bad","Account keys don’t match the server","Someone may have taken @"+cfg.user+", or the server was reset."),reset=1)}catch(e){e.message==="not found"?(add("bad","Your username isn’t on this server","The server data was reset."),reset=1):add("warn","Couldn’t verify your account",Net.msg(e))}}
-else if(up)add("warn","No username yet","Choose one in Settings → Network and updates.")}
+else if(up)add("warn","Not logged in","Log in or create an account on the first screen.")}
 if(srvList().length>1){await probe();const n=srvList().length,u=srvList().filter(x=>SV[x]&&SV[x].up).length;add(u===n?"ok":u?"warn":"bad","Servers online: "+u+" of "+n,u===n?"Messages switch automatically if one goes down.":"Down: "+srvList().filter(x=>!(SV[x]&&SV[x].up)).map(x=>x.replace(/^https?:\/\//,"")).join(", "))}
 UP.s==="avail"?add("warn","Update available","v"+UP.v+". Tap Update now at the top of Settings."):UP.s==="error"?add("warn","Couldn’t check for updates"):add("ok","App is up to date");
 ERR.length?add("warn",ERR.length+" error"+(ERR.length>1?"s":"")+" logged this session",ERR.slice(-3).map(e=>e.w+": "+e.m).join(" · ")):add("ok","No errors logged");
@@ -321,7 +363,6 @@ function ask(t,ph,cb,extra=[]){window._u="";sheet(t,[["Save",()=>cb(window._u.tr
 Object.assign(A,{
 newchat(){ask("Find by username","username",async v=>{const u=v.toLowerCase();if(!C().token)return toast("Choose a username in Settings first");if(u===C().user)return toast("That’s your own username");try{const pub=await Net.find(u);if(!S.chats.some(c=>c.id===u))S.chats.push({id:u,name:u,msgs:[],dis:C().disap,ver:false,unread:0,pub});save();A.open(u)}catch(e){toast(e.message==="not found"?"No user “"+u+"” found":"Couldn’t search: "+Net.msg(e))}})},
 server(){ask("Server address","http://YOUR_IP:3000",v=>{C().server=v&&!/^https?:\/\//.test(v)?"http://"+v:v;save();restartPoll();render();discover()})},
-claim(){ask("Choose a username","3–20 letters, numbers or _",async v=>{if(!C().server)return toast("Set the server address first");try{await Net.reg(v.toLowerCase());restartPoll();discover();toast("You are @"+v.toLowerCase());render()}catch(e){toast(e.message==="taken"?"That username is taken":"Could not register: "+Net.msg(e))}})},
 skins(){sheet("Style",Object.entries(SK).map(([k,x])=>[x.n,()=>{C().skin=k;C().acc=x.acc;C().theme=x.dark?"dark":x.light?"light":"system";save();applyTheme();render()}]))},
 async upd(s){try{const d=await(await fetch("version.json?"+Date.now(),{cache:"no-store"})).json();if(d.version===VER){if(!s)toast("You’re up to date (v"+VER+")");return}
 sheet("Update available · v"+d.version,[["Update now",async()=>{try{for(const k of await caches.keys())await caches.delete(k)}catch(e){}location.replace(location.pathname+"?v="+d.version)}]],`<p class="hint">${E(d.notes||"")}</p>`)}catch(e){if(!s)toast("In-app updates work in the hosted app")}}});

@@ -8,6 +8,9 @@ class HttpErr extends Error{constructor(c,m){super(m);this.code=c}}
 const str=(v,m)=>typeof v==='string'&&v.length>0&&v.length<=m;
 const hex=async s=>[...new Uint8Array(await crypto.subtle.digest('SHA-256',new TextEncoder().encode(String(s))))].map(b=>b.toString(16).padStart(2,'0')).join('');
 const same=(a,b)=>{if(a.length!==b.length)return false;let r=0;for(let i=0;i<a.length;i++)r|=a.charCodeAt(i)^b.charCodeAt(i);return r===0};
+const HEX64=/^[0-9a-f]{64}$/;
+const rand=()=>[...crypto.getRandomValues(new Uint8Array(32))].map(b=>b.toString(16).padStart(2,'0')).join('');
+const vaultOk=v=>!!v&&typeof v==='object'&&str(v.iv,64)&&str(v.ct,4096);
 const parse=raw=>{try{return JSON.parse(raw||'{}')}catch(e){throw new HttpErr(400,'invalid json')}};
 
 export default{
@@ -20,17 +23,27 @@ export default{
 
 export class Hub{
   constructor(state,env){
-    this.sql=state.storage.sql;this.waiters=new Map();this.hits=new Map();this.regs=new Map();
+    this.sql=state.storage.sql;this.waiters=new Map();this.hits=new Map();this.regs=new Map();this.logins=new Map();this.fails=new Map();
     state.blockConcurrencyWhile(async()=>{
-      this.run('CREATE TABLE IF NOT EXISTS users(name TEXT PRIMARY KEY,pub TEXT NOT NULL,th TEXT NOT NULL,at INTEGER NOT NULL)');
+      this.run('CREATE TABLE IF NOT EXISTS users(name TEXT PRIMARY KEY,pub TEXT NOT NULL,th TEXT NOT NULL,at INTEGER NOT NULL,ah TEXT,vault TEXT)');
+      for(const c of['ah TEXT','vault TEXT']){try{this.run('ALTER TABLE users ADD COLUMN '+c)}catch(e){}}   // older databases
+      this.run('CREATE TABLE IF NOT EXISTS tokens(th TEXT PRIMARY KEY,user TEXT NOT NULL,at INTEGER NOT NULL)');
+      this.run('CREATE INDEX IF NOT EXISTS tokens_user ON tokens(user,at)');
       this.run('CREATE TABLE IF NOT EXISTS box(id TEXT PRIMARY KEY,to_user TEXT NOT NULL,from_user TEXT NOT NULL,ct TEXT NOT NULL,iv TEXT NOT NULL,ts INTEGER NOT NULL)');
       this.run('CREATE INDEX IF NOT EXISTS box_to ON box(to_user,ts)');
     });
   }
   run(q,...p){return this.sql.exec(q,...p).toArray()}
-  user(u){return typeof u==='string'?this.run('SELECT name,pub,th,at FROM users WHERE name=?',u)[0]:undefined}
+  user(u){return typeof u==='string'?this.run('SELECT name,pub,th,at,ah,vault FROM users WHERE name=?',u)[0]:undefined}
   limited(map,ip,max,win){const n=Date.now(),h=(map.get(ip)||[]).filter(t=>n-t<win);h.push(n);map.set(ip,h);if(map.size>5000)map.clear();return h.length>max}
-  async auth(u,t){const r=this.user(u);if(!r||typeof t!=='string'||!t)throw new HttpErr(401,'auth');if(!same(await hex(t),r.th))throw new HttpErr(401,'auth')}
+  async auth(u,t){
+    const r=this.user(u);if(!r||typeof t!=='string'||!t)throw new HttpErr(401,'auth');
+    const h=await hex(t);
+    if(!same(h,r.th)&&!this.run('SELECT 1 AS x FROM tokens WHERE user=? AND th=?',u,h).length)throw new HttpErr(401,'auth');
+    return h;
+  }
+  failed(u){const f=this.fails.get(u)||{n:0,t:0};if(Date.now()-f.t>9e5)f.n=0;return f}
+  bad(u,f){f.n++;f.t=Date.now();if(this.fails.size>5000)this.fails.clear();this.fails.set(u,f)}
   notify(u){const s=this.waiters.get(u);if(s)for(const f of[...s])f()}
 
   async fetch(req){
@@ -45,13 +58,50 @@ export class Hub{
 
       if(p==='/register'&&req.method==='POST'){
         if(this.limited(this.regs,ip,5,36e5))throw new HttpErr(429,'too many sign-ups');
-        const{u,pub}=parse(raw);
+        const{u,pub,auth,vault}=parse(raw);
         if(typeof u!=='string'||!NAME.test(u))throw new HttpErr(400,'bad username');
+        const withPw=auth!==undefined||vault!==undefined;
+        if(withPw&&(!HEX64.test(auth||'')||!vaultOk(vault)))throw new HttpErr(400,'bad password data');
         if(!pub||pub.kty!=='EC'||pub.crv!=='P-256'||!str(pub.x,100)||!str(pub.y,100))throw new HttpErr(400,'bad key');
-        const tok=[...crypto.getRandomValues(new Uint8Array(32))].map(b=>b.toString(16).padStart(2,'0')).join(''),th=await hex(tok);
+        const tok=rand(),th=await hex(tok),ah=withPw?await hex(auth):null;
         if(this.user(u))throw new HttpErr(409,'taken');   // check and insert with no await in between
-        this.run('INSERT INTO users(name,pub,th,at) VALUES(?,?,?,?)',u,JSON.stringify({kty:'EC',crv:'P-256',x:pub.x,y:pub.y}),th,Date.now());
+        this.run('INSERT INTO users(name,pub,th,at,ah,vault) VALUES(?,?,?,?,?,?)',u,JSON.stringify({kty:'EC',crv:'P-256',x:pub.x,y:pub.y}),th,Date.now(),ah,withPw?JSON.stringify(vault):null);
         return reply({token:tok});
+      }
+
+      if(p==='/login'&&req.method==='POST'){
+        if(this.limited(this.logins,ip,30,9e5))throw new HttpErr(429,'too many attempts');
+        const{u,auth}=parse(raw);
+        if(typeof u!=='string'||!HEX64.test(auth||''))throw new HttpErr(400,'bad login');
+        const f=this.failed(u);if(f.n>=5)throw new HttpErr(429,'too many attempts');
+        const r=this.user(u),ah=await hex(auth);
+        if(!r||!r.ah||!r.vault||!same(ah,r.ah)){this.bad(u,f);throw new HttpErr(401,'login')}
+        this.fails.delete(u);
+        const tok=rand();
+        this.run('INSERT INTO tokens(th,user,at) VALUES(?,?,?)',await hex(tok),u,Date.now());
+        this.run('DELETE FROM tokens WHERE user=? AND th NOT IN (SELECT th FROM tokens WHERE user=? ORDER BY at DESC LIMIT 10)',u,u);
+        return reply({token:tok,pub:JSON.parse(r.pub),vault:JSON.parse(r.vault)});
+      }
+
+      if(p==='/password'&&req.method==='POST'){
+        const{u,auth,old,vault}=parse(raw);
+        await this.auth(u,t);
+        if(!HEX64.test(auth||'')||!vaultOk(vault))throw new HttpErr(400,'bad password data');
+        const r=this.user(u);
+        if(r.ah){
+          const f=this.failed(u);if(f.n>=5)throw new HttpErr(429,'too many attempts');
+          if(!HEX64.test(old||'')||!same(await hex(old),r.ah)){this.bad(u,f);throw new HttpErr(401,'login')}
+          this.fails.delete(u);
+        }
+        this.run('UPDATE users SET ah=?,vault=? WHERE name=?',await hex(auth),JSON.stringify(vault),u);
+        return reply({ok:true});
+      }
+
+      if(p==='/logout'&&req.method==='POST'){
+        const u=parse(raw).u,h=await this.auth(u,t),r=this.user(u);
+        this.run('DELETE FROM tokens WHERE user=? AND th=?',u,h);
+        if(same(h,r.th))this.run('UPDATE users SET th=? WHERE name=?',await hex(rand()),u);
+        return reply({ok:true});
       }
 
       if(p.startsWith('/user/')){

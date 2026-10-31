@@ -20,10 +20,15 @@ let soon=null;const saveSoon=()=>{if(!soon)soon=setTimeout(()=>{soon=null;save()
 
 class HttpErr extends Error{constructor(c,m){super(m);this.code=c}}
 const sha=s=>crypto.createHash('sha256').update(String(s)).digest('hex');
-const NAME=/^[a-z0-9_]{3,20}$/;
+const NAME=/^[a-z0-9_]{3,20}$/,HEX64=/^[0-9a-f]{64}$/;
+const vaultOk=v=>!!v&&typeof v==='object'&&str(v.iv,64)&&str(v.ct,4096);
+const eq=(a,b)=>{const x=Buffer.from(String(a)),y=Buffer.from(String(b));return x.length===y.length&&crypto.timingSafeEqual(x,y)};
 const has=u=>typeof u==='string'&&Object.hasOwn(db.users,u);
 const str=(v,max)=>typeof v==='string'&&v.length>0&&v.length<=max;
-const auth=(u,t)=>has(u)&&typeof t==='string'&&t.length>0&&crypto.timingSafeEqual(Buffer.from(sha(t)),Buffer.from(db.users[u].th));
+const auth=(u,t)=>{if(!has(u)||typeof t!=='string'||!t)return false;const h=sha(t),r=db.users[u];return eq(h,r.th)||(r.ths||[]).some(x=>eq(h,x))};
+const fails=new Map(),logins={};
+const failed=u=>{const f=fails.get(u)||{n:0,t:0};if(Date.now()-f.t>9e5)f.n=0;return f};
+const badTry=(u,f)=>{f.n++;f.t=Date.now();if(fails.size>5000)fails.clear();fails.set(u,f)};
 const hits={},regs={};
 const limited=(map,ip,max,win)=>{const n=Date.now(),h=(map[ip]||[]).filter(t=>n-t<win);h.push(n);map[ip]=h;return h.length>max};
 const out=(r,c,o)=>{r.writeHead(c,{'content-type':'application/json','access-control-allow-origin':'*','access-control-allow-private-network':'true','access-control-allow-headers':'content-type,x-token','access-control-allow-methods':'GET,POST,OPTIONS'});r.end(JSON.stringify(o))};
@@ -51,11 +56,20 @@ async function flush(){if(flushing||!db.outq.length)return;flushing=true;
   try{const q=db.outq;db.outq=[];const keep=[];
     await Promise.all(q.map(async j=>{if(Date.now()-j.ts>TTL)return;try{await peerCall(j.peer,j.p,j.obj,3000);up[j.peer]=true}catch(e){up[j.peer]=false;keep.push(j)}}));
     db.outq=keep.concat(db.outq);saveSoon()}finally{flushing=false}}
-function mergeUser(u,rec){if(!NAME.test(u||'')||!rec||!rec.pub||!str(rec.th,64)||typeof rec.at!=='number')return false;
-  const cur=db.users[u];if(!cur||!Object.hasOwn(db.users,u)){db.users[u]={pub:rec.pub,th:rec.th,at:rec.at};return true}
-  if(cur.th===rec.th)return false;
-  const win=rec.at<cur.at||(rec.at===cur.at&&rec.th<cur.th);   // earliest registration wins
-  if(win){db.users[u]={pub:rec.pub,th:rec.th,at:rec.at};return true}return false}
+function mergeUser(u,rec){
+  if(!NAME.test(u||'')||!rec||!rec.pub||!str(rec.th,64)||typeof rec.at!=='number')return false;
+  if((rec.ah!=null&&!HEX64.test(rec.ah))||(rec.vault!=null&&!vaultOk(rec.vault)))return false;
+  const ths=(Array.isArray(rec.ths)?rec.ths:[]).filter(x=>HEX64.test(x)).slice(-10);
+  const clean={pub:{kty:'EC',crv:'P-256',x:rec.pub.x,y:rec.pub.y},th:rec.th,at:rec.at,ah:rec.ah||null,vault:rec.vault||null,ths,mod:Number(rec.mod)||rec.at};
+  const cur=Object.hasOwn(db.users,u)?db.users[u]:null;
+  if(!cur){db.users[u]=clean;return true}
+  if(cur.pub.x===clean.pub.x&&cur.pub.y===clean.pub.y){   // same account: newest change wins
+    const cm=cur.mod||cur.at;
+    if(clean.mod>cm){db.users[u]=clean;return true}
+    if(clean.mod===cm){const un=[...new Set([...(cur.ths||[]),...ths])].slice(-10);if(un.length!==(cur.ths||[]).length){cur.ths=un;return true}}
+    return false}
+  const win=rec.at<cur.at||(rec.at===cur.at&&rec.th<cur.th);   // different key: earliest registration wins
+  if(win){db.users[u]=clean;return true}return false}
 function addEnv(u,e){if(!NAME.test(u||'')||!e||!str(e.id,64)||db.acked[e.id]||!str(e.from,20)||!str(e.ct,60000)||!str(e.iv,40))return false;
   const b=db.box[u]=db.box[u]||[];if(b.some(x=>x.id===e.id)||b.length>=BOX_MAX)return false;
   b.push({id:e.id,from:e.from,ct:e.ct,iv:e.iv,ts:Number(e.ts)||Date.now()});b.sort((x,y)=>x.ts-y.ts);notify(u);return true}
@@ -100,18 +114,44 @@ http.createServer(async(req,res)=>{try{
 
   if(p==='/register'&&req.method==='POST'){
     if(limited(regs,ip,5,36e5))throw new HttpErr(429,'too many sign-ups');
-    const{u,pub}=parse(raw);
+    const{u,pub,auth:pw,vault}=parse(raw);
     if(typeof u!=='string'||!NAME.test(u))throw new HttpErr(400,'bad username');
+    const withPw=pw!==undefined||vault!==undefined;
+    if(withPw&&(!HEX64.test(pw||'')||!vaultOk(vault)))throw new HttpErr(400,'bad password data');
     if(!pub||pub.kty!=='EC'||pub.crv!=='P-256'||!str(pub.x,100)||!str(pub.y,100))throw new HttpErr(400,'bad key');
     if(has(u))throw new HttpErr(409,'taken');
     const taken=(await Promise.all(PEERS.map(x=>peerCall(x,'/peer/has',{u},1500).then(r=>!!r.has).catch(()=>false)))).some(Boolean);
     if(taken)throw new HttpErr(409,'taken');
     if(has(u))throw new HttpErr(409,'taken');
-    const tok=crypto.randomBytes(32).toString('hex'),rec={pub:{kty:'EC',crv:'P-256',x:pub.x,y:pub.y},th:sha(tok),at:Date.now()};
+    const tok=crypto.randomBytes(32).toString('hex'),now=Date.now(),rec={pub:{kty:'EC',crv:'P-256',x:pub.x,y:pub.y},th:sha(tok),at:now,ah:withPw?sha(pw):null,vault:withPw?vault:null,ths:[],mod:now};
     db.users[u]=rec;if(!save()){delete db.users[u];throw new HttpErr(500,'storage error')}
     fanout('/peer/user',{u,rec});
     return out(res,200,{token:tok})}
 
+  if(p==='/login'&&req.method==='POST'){
+    if(limited(logins,ip,30,9e5))throw new HttpErr(429,'too many attempts');
+    const{u,auth:pw}=parse(raw);
+    if(typeof u!=='string'||!HEX64.test(pw||''))throw new HttpErr(400,'bad login');
+    const f=failed(u);if(f.n>=5)throw new HttpErr(429,'too many attempts');
+    const r=has(u)?db.users[u]:null;
+    if(!r||!r.ah||!r.vault||!eq(sha(pw),r.ah)){badTry(u,f);throw new HttpErr(401,'login')}
+    fails.delete(u);
+    const tok=crypto.randomBytes(32).toString('hex');
+    r.ths=[...(r.ths||[]),sha(tok)].slice(-10);r.mod=Date.now();save();fanout('/peer/user',{u,rec:r});
+    return out(res,200,{token:tok,pub:r.pub,vault:r.vault})}
+  if(p==='/password'&&req.method==='POST'){
+    const{u,auth:pw,old,vault}=parse(raw);
+    if(!auth(u,t))throw new HttpErr(401,'auth');
+    if(!HEX64.test(pw||'')||!vaultOk(vault))throw new HttpErr(400,'bad password data');
+    const r=db.users[u];
+    if(r.ah){const f=failed(u);if(f.n>=5)throw new HttpErr(429,'too many attempts');
+      if(!HEX64.test(old||'')||!eq(sha(old),r.ah)){badTry(u,f);throw new HttpErr(401,'login')}fails.delete(u)}
+    r.ah=sha(pw);r.vault=vault;r.mod=Date.now();save();fanout('/peer/user',{u,rec:r});
+    return out(res,200,{ok:true})}
+  if(p==='/logout'&&req.method==='POST'){
+    const{u}=parse(raw);if(!auth(u,t))throw new HttpErr(401,'auth');
+    const r=db.users[u],h=sha(t);r.ths=(r.ths||[]).filter(x=>x!==h);if(eq(h,r.th))r.th=sha(crypto.randomBytes(32));
+    r.mod=Date.now();save();fanout('/peer/user',{u,rec:r});return out(res,200,{ok:true})}
   if(p.startsWith('/user/')){let u;try{u=decodeURIComponent(p.slice(6))}catch(e){throw new HttpErr(400,'bad username')}
     if(!has(u))throw new HttpErr(404,'not found');return out(res,200,{pub:db.users[u].pub})}
 
