@@ -2,6 +2,8 @@ name: Build APK
 on:
   push:
   workflow_dispatch:
+permissions:
+  contents: write
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -23,3 +25,10 @@ jobs:
         with:
           name: quantum-signal-apk
           path: android/app/build/outputs/apk/debug/app-debug.apk
+      - name: Publish APK to a permanent download link
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          cp android/app/build/outputs/apk/debug/app-debug.apk quantum-signal.apk
+          gh release delete latest --yes --cleanup-tag 2>/dev/null || true
+          gh release create latest quantum-signal.apk --target "$GITHUB_SHA" --title "Quantum Signal (newest build)" --notes "Built from commit ${GITHUB_SHA::7} on $(date -u '+%Y-%m-%d %H:%M') UTC" --latest
