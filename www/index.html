@@ -197,7 +197,7 @@ document.addEventListener("input",e=>{if(e.target.id==="sq"){q=e.target.value;$(
 document.addEventListener("keydown",e=>{if(e.key==="Enter"&&e.target.id==="inp")send();if(e.key==="Enter"&&["au","ap","ap2"].includes(e.target.id))A.authgo()});
 document.addEventListener("visibilitychange",()=>{if(document.hidden){hid=Date.now();if(C().screenSec)document.body.classList.add("priv")}else{document.body.classList.remove("priv");if(!locked&&C().pin&&(Date.now()-hid)/1000>=C().autolock){locked=true;pin="";render()}}});
 setInterval(()=>{const n=Date.now();let ch=0;if(!locked&&C().pin&&C().idle&&n-lastAct>C().idle*6e4){locked=true;pin="";render()}S.chats.forEach(c=>{const k=c.msgs.length;c.msgs=c.msgs.filter(m=>(!m.exp||m.exp>n)&&(!C().keep||n-m.ts<C().keep*864e5));if(c.msgs.length!==k)ch=1});if(ch&&!locked){save();view==="chat"?renderMsgs():render()}},1000);
-const VER="0.7.0";
+const VER="0.8.0";
 const SK={signal:{n:"Signal",acc:"#3a76f0",rad:18,wall:"",f:""},ios:{n:"iOS",acc:"#0a84ff",rad:20,wall:"",f:"-apple-system,BlinkMacSystemFont,'SF Pro Text',system-ui,sans-serif"},midnight:{n:"Midnight (OLED)",acc:"#8b5cf6",rad:16,wall:"#000",f:"",dark:1},aurora:{n:"Aurora",acc:"#14b8a6",rad:22,wall:"linear-gradient(160deg,#0f2027,#203a43,#2c5364)",f:"",dark:1},sunset:{n:"Sunset",acc:"#f97316",rad:20,wall:"linear-gradient(160deg,#fff1e6,#ffe0f0)",f:"",light:1}};
 /* End-to-end encryption: ECDH P-256 key agreement + AES-GCM. Server only ever sees ciphertext. */
 const Net={
