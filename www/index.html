@@ -110,11 +110,11 @@ const PK={autolock:{t:"Auto-lock",o:[[0,"Immediately"],[30,"After 30 seconds"],[
 const ACC=["#3a76f0","#6d4df2","#e0457b","#2fa36b","#e08a1e","#0e9fb5"];
 const fmt=t=>new Date(t).toLocaleTimeString([],{hour:"numeric",minute:"2-digit"});
 const fday=t=>new Date(t).toDateString()===new Date().toDateString()?fmt(t):new Date(t).toLocaleDateString([],{weekday:"short"});
-function seed(){return{mig:3,cfg:{server:CF,pin:null,bio:true,autolock:30,screenSec:true,receipts:true,incog:true,wipe10:false,theme:"system",acc:"#3a76f0",font:16,disap:0,cred:null,skin:"signal",bshape:"signal",bcol:"",inc:"plain",ts:"group"},chats:[{id:"Note to Self",name:"Note to Self",msgs:[],dis:0,ver:false,unread:0}]}}
+function seed(){return{mig:3,cfg:{server:CF,pin:null,bio:true,autolock:30,screenSec:true,receipts:true,notif:true,incog:true,wipe10:false,theme:"system",acc:"#3a76f0",font:16,disap:0,cred:null,skin:"signal",bshape:"signal",bcol:"",inc:"plain",ts:"group"},chats:[{id:"Note to Self",name:"Note to Self",msgs:[],dis:0,ver:false,unread:0}]}}
 let S,view="list",tab="chats",cur=null,q="",reply=null,locked=true,pin="",stage=0,first="",tries=0,until=0,hid=0;
 const C=()=>S.cfg,chat=()=>S.chats.find(c=>c.id===cur),last=c=>c.msgs.length?c.msgs[c.msgs.length-1].ts:0;
 function save(){try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){}}
-function load(){try{S=JSON.parse(localStorage.getItem(KEY))}catch(e){S=null}if(!S||!S.cfg)S=seed();S.cfg=Object.assign({bshape:"signal",bcol:"",inc:"plain",ts:"group",skin:"signal",twofa:false,idle:0,keyAlert:true,hidePrev:false,clipClear:false,keep:0,servers:[],autoSwitch:true},S.cfg);if(!S.cfg.server)S.cfg.server=CF;if(S.mig!==3){S.chats=S.chats.filter(c=>c.pub||c.id==="Note to Self");const n=S.chats.find(c=>c.id==="Note to Self");if(n&&n.msgs.length===1&&n.msgs[0].t.startsWith("Ideas:"))n.msgs=[];S.mig=3;save()}}
+function load(){try{S=JSON.parse(localStorage.getItem(KEY))}catch(e){S=null}if(!S||!S.cfg)S=seed();S.cfg=Object.assign({bshape:"signal",bcol:"",inc:"plain",ts:"group",skin:"signal",notif:true,twofa:false,idle:0,keyAlert:true,hidePrev:false,clipClear:false,keep:0,servers:[],autoSwitch:true},S.cfg);if(!S.cfg.server)S.cfg.server=CF;if(S.mig!==3){S.chats=S.chats.filter(c=>c.pub||c.id==="Note to Self");const n=S.chats.find(c=>c.id==="Note to Self");if(n&&n.msgs.length===1&&n.msgs[0].t.startsWith("Ideas:"))n.msgs=[];S.mig=3;save()}}
 function applyTheme(){const r=document.documentElement;r.dataset.theme=C().theme==="system"?"":C().theme;r.style.setProperty("--acc",C().acc);r.style.setProperty("--fs",C().font+"px");const k=SK[C().skin]||SK.signal;r.style.setProperty("--rad",k.rad+"px");r.style.setProperty("--wall",k.wall||"var(--bg)");k.wall==="#000"?r.style.setProperty("--bg","#000"):r.style.removeProperty("--bg");document.body.style.fontFamily=k.f||"";r.style.setProperty("--bo",C().bcol||"var(--acc)");r.style.setProperty("--rad",({signal:18,soft:24,sharp:6})[C().bshape||"signal"]+"px");r.dataset.inc=C().inc||"plain"}
 function toast(t){const d=document.createElement("div");d.className="toast";d.textContent=t;document.body.append(d);setTimeout(()=>d.remove(),2400)}
 function sheet(t,items,html=""){const d=document.createElement("div");d.className="sh";d.innerHTML=`<div class="bx"><h4>${t}</h4>${html}${items.map((x,i)=>`<button data-i="${i}">${x[0]}</button>`).join("")}</div>`;d.onclick=e=>{const b=e.target.closest("button");if(b){d.remove();items[b.dataset.i][1]()}else if(e.target===d)d.remove()};document.body.append(d)}
@@ -148,7 +148,7 @@ const tg=(k,t,d)=>`<div class="row" data-a="tg" data-v="${k}"><div><b>${t}</b><s
 const pk=(k,t)=>`<div class="row" data-a="pick" data-v="${k}"><div><b>${t}</b></div><small>${(PK[k].o.find(x=>x[0]==c[k])||[0,"Default"])[1]}</small></div>`;
 const act=(a,t,d,x="")=>`<div class="row ${x}" data-a="${a}"><div><b>${t}</b><small>${d}</small></div></div>`;
 return`<div class="pg">${upCard()}<div class="grp"><h3>Troubleshooting</h3>${act("debug","Check for errors","Scan the app, fix what it can, and show a report")}</div><div class="prof">${av(c.user||"You",56)}<div><b style="font-size:18px">${c.user?"@"+E(c.user):"You"}</b><small>${c.token?"End-to-end encrypted":"Not connected to a server yet"}</small></div></div>
-<div class="grp"><h3>Privacy and security</h3>${tg("bio","Fingerprint unlock","Use your device’s fingerprint sensor to open the app")}${pk("autolock","Auto-lock")}${tg("screenSec","Screen security","Hide the app in recent apps and block previews")}${tg("incog","Incognito keyboard","Ask the keyboard not to learn what you type")}${tg("receipts","Read receipts","Let people see when you read their messages")}${tg("wipe10","Wipe after 10 wrong PINs","Erase all data on this device")}${pk("disap","Default disappearing timer")}</div>
+<div class="grp"><h3>Privacy and security</h3>${tg("bio","Fingerprint unlock","Use your device’s fingerprint sensor to open the app")}${pk("autolock","Auto-lock")}${tg("screenSec","Screen security","Hide the app in recent apps and block previews")}${tg("incog","Incognito keyboard","Ask the keyboard not to learn what you type")}${tg("receipts","Read receipts","Let people see when you read their messages")}${tg("notif","Message notifications","Show a notification when a new message arrives")}${tg("wipe10","Wipe after 10 wrong PINs","Erase all data on this device")}${pk("disap","Default disappearing timer")}</div>
 <div class="grp"><h3>Appearance</h3><div class="row" data-a="skins"><div><b>Style</b></div><small>${(SK[c.skin]||SK.signal).n}</small></div>${pk("theme","Theme")}${pk("font","Message size")}<div class="sw2">${ACC.map(a=>`<i data-a="acc" data-v="${a}" class="${c.acc===a?"on":""}" style="background:${a}"></i>`).join("")}</div></div>
 <div class="grp"><h3>Advanced security</h3>${tg("twofa","Fingerprint + PIN","Require both to unlock")}${pk("idle","Lock when idle")}${tg("keyAlert","Contact key change alerts","Warn if someone’s encryption key changes")}${tg("hidePrev","Hide message previews","Don’t show message text in the chat list")}${tg("clipClear","Clear clipboard after copying","Wipes copied text after 30 seconds")}${pk("keep","Delete old messages")}</div>
 <div class="grp"><h3>Chat bubbles</h3>${pk("bshape","Bubble shape")}${pk("inc","Incoming bubbles")}${pk("ts","Timestamps")}<div class="row" style="cursor:default"><div><b>Sent bubble colour</b></div></div><div class="sw2">${BC.map(x=>`<i data-a="bcol" data-v="${x}" class="${(c.bcol||"")===x?"on":""}" style="background:${x||c.acc}"></i>`).join("")}</div></div>
@@ -163,7 +163,7 @@ el.innerHTML=h;el.scrollTop=el.scrollHeight}
 function safety(c){let h=H(c.name+"qs"),o=[];for(let i=0;i<12;i++){h=(h*1103515245+12345)>>>0;o.push(String(h%100000).padStart(5,"0"))}return o}
 function send(){const i=$("#inp"),t=i.value.trim();if(!t)return;if(t.length>4000)return toast("Message too long (4000 characters max)");const c=chat(),m={id:uid(),me:1,t,ts:Date.now(),r:null,q:reply,st:c.pub?0:1,exp:c.dis?Date.now()+c.dis*1000:0};c.msgs.push(m);reply=null;i.value="";$("#rp").innerHTML="";save();renderMsgs();if(c.pub)relay(c,m)}
 function msg(t){const m=$("#lm");if(m)m.textContent=t}
-function unlock(){locked=false;view="list";render();setTimeout(offerCF,900)}
+function unlock(){locked=false;view="list";render();acquireWakeLock();restartPoll();poll();setTimeout(offerCF,900)}
 function wipe(){try{localStorage.removeItem(KEY)}catch(e){}S=seed();applyTheme();locked=true;pin="";stage=0;view="list";tab="chats";render()}
 const A={
 tab(v){tab=v;render()},
@@ -187,7 +187,7 @@ dis(){const c=chat();sheet("Disappearing messages",Object.entries(DL).map(([k,v]
 info(){const c=chat();sheet("Safety number",[[c.ver?"Mark as unverified":"Mark as verified",()=>{c.ver=!c.ver;save();render()}]],`<div class="sn">${safety(c).map(x=>`<span>${x}</span>`).join("")}</div><p class="hint">Compare these numbers with ${E(c.name)} in person to confirm no one is intercepting your chat.</p>`)},
 
 
-async tg(k){const c=C();if(!c[k]&&(k==="bio"||k==="twofa")){if(k==="twofa"&&!c.bio)return toast("Turn on fingerprint unlock first");if(!(await Bio.auth()))return toast(Bio.err||"Fingerprint is not available on this device")}c[k]=!c[k];if(k==="bio"&&!c.bio)c.twofa=false;save();render()},
+async tg(k){const c=C();if(k==="notif"&&!c[k]){const ok=await reqNotifPerm();if(!ok){toast("Notifications are blocked. Allow them in your phone’s Settings to get alerts.");return}}if(!c[k]&&(k==="bio"||k==="twofa")){if(k==="twofa"&&!c.bio)return toast("Turn on fingerprint unlock first");if(!(await Bio.auth()))return toast(Bio.err||"Fingerprint is not available on this device")}c[k]=!c[k];if(k==="bio"&&!c.bio)c.twofa=false;save();render()},
 pick(k){const p=PK[k];sheet(p.t,p.o.map(([v,l])=>[l,()=>{C()[k]=v;save();applyTheme();render()}]))},
 acc(v){C().acc=v;save();applyTheme();render()},
 async fp(){toast(await Bio.auth()?"Fingerprint verified ✓":(Bio.err||"Fingerprint check failed"))},
@@ -198,9 +198,9 @@ panic(){sheet("Wipe all data?",[["Yes, wipe everything now",wipe]],'<p class="hi
 document.addEventListener("click",e=>{const el=e.target.closest("[data-a]");if(el&&A[el.dataset.a])A[el.dataset.a](el.dataset.v)});
 document.addEventListener("input",e=>{if(e.target.id==="sq"){q=e.target.value;$("#cl").innerHTML=rows()}});
 document.addEventListener("keydown",e=>{if(e.key==="Enter"&&e.target.id==="inp")send();if(e.key==="Enter"&&["au","ap","ap2"].includes(e.target.id))A.authgo()});
-document.addEventListener("visibilitychange",()=>{if(document.hidden){hid=Date.now();if(C().screenSec)document.body.classList.add("priv")}else{document.body.classList.remove("priv");if(!locked&&C().pin&&(Date.now()-hid)/1000>=C().autolock){locked=true;pin="";render()}}});
+document.addEventListener("visibilitychange",()=>{try{if(document.hidden){hid=Date.now();releaseWakeLock();if(C().screenSec)document.body.classList.add("priv")}else{document.body.classList.remove("priv");document.title="Quantum Signal";try{if("clearAppBadge" in navigator)navigator.clearAppBadge().catch(()=>{})}catch(e){}acquireWakeLock();if(!locked&&C().pin&&(Date.now()-hid)/1000>=C().autolock){locked=true;pin="";render()}else if(!locked){restartPoll();poll()}}}catch(e){logErr("visibility",e.message||e)}});
 setInterval(()=>{const n=Date.now();let ch=0;if(!locked&&C().pin&&C().idle&&n-lastAct>C().idle*6e4){locked=true;pin="";render()}S.chats.forEach(c=>{const k=c.msgs.length;c.msgs=c.msgs.filter(m=>(!m.exp||m.exp>n)&&(!C().keep||n-m.ts<C().keep*864e5));if(c.msgs.length!==k)ch=1});if(ch&&!locked){save();view==="chat"?renderMsgs():render()}},1000);
-const VER="0.8.0";
+const VER="0.8.1";
 const SK={signal:{n:"Signal",acc:"#3a76f0",rad:18,wall:"",f:""},ios:{n:"iOS",acc:"#0a84ff",rad:20,wall:"",f:"-apple-system,BlinkMacSystemFont,'SF Pro Text',system-ui,sans-serif"},midnight:{n:"Midnight (OLED)",acc:"#8b5cf6",rad:16,wall:"#000",f:"",dark:1},aurora:{n:"Aurora",acc:"#14b8a6",rad:22,wall:"linear-gradient(160deg,#0f2027,#203a43,#2c5364)",f:"",dark:1},sunset:{n:"Sunset",acc:"#f97316",rad:20,wall:"linear-gradient(160deg,#fff1e6,#ffe0f0)",f:"",light:1}};
 /* End-to-end encryption: ECDH P-256 key agreement + AES-GCM. Server only ever sees ciphertext. */
 const Net={
@@ -222,32 +222,46 @@ const BC=["","#2c6bed","#6d4df2","#d6336c","#1f9d6b","#e8590c","#343a40"];
 const uid=()=>Date.now().toString(36)+Math.random().toString(36).slice(2,8),busy=new Set();let online=null;
 const dayLbl=t=>new Date(t).toDateString()===new Date().toDateString()?"Today":new Date(t).toLocaleDateString([],{weekday:"long",month:"short",day:"numeric"});
 const tick=st=>`<svg class="tk ${st===2?'dl':st===3?'rd':''}" width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">${st===-1?'<circle cx="8" cy="8" r="6.5" stroke="#ff9a9a"/><path d="M8 4.6v4M8 11.2v.1" stroke="#ff9a9a"/>':st===0?'<circle cx="8" cy="8" r="6.5" stroke-dasharray="2 2.4"/>':st===1?'<circle cx="8" cy="8" r="6.5"/><path d="M5 8.2l2 2 3.6-4"/>':st===2?'<circle cx="8" cy="8" r="6.5"/><path d="M3.8 8.2l2 2 3-3.4M7 9.6l.4.4 3.8-4.4"/>':'<circle cx="8" cy="8" r="7" fill="currentColor"/><path d="M3.8 8.2l2 2 3-3.4M7 9.6l.4.4 3.8-4.4" stroke="var(--bo,var(--acc))" stroke-width="2"/>'}</svg>`;
+
+/* Notifications + wake lock: notify on every new incoming message, keep the
+   screen/CPU awake while the app is open so long-polling is not throttled,
+   and fall back gracefully when a channel is unavailable. Nothing here can
+   wake a fully-closed app — that needs server push (FCM). */
+let wakeLock=null;
+async function acquireWakeLock(){try{if(!("wakeLock" in navigator)||document.hidden)return;if(wakeLock)return;wakeLock=await navigator.wakeLock.request("screen");wakeLock.addEventListener("release",()=>{wakeLock=null})}catch(e){wakeLock=null;logErr("wakelock",e.message||e)}}
+function releaseWakeLock(){try{if(wakeLock){wakeLock.release();wakeLock=null}}catch(e){wakeLock=null}}
+async function reqNotifPerm(){try{if("Notification" in window){if(Notification.permission==="granted")return true;if(Notification.permission==="denied")return false;return (await Notification.requestPermission())==="granted"}}catch(e){logErr("notif-perm",e.message||e)}try{const L=window.Capacitor&&Capacitor.Plugins&&Capacitor.Plugins.LocalNotifications;if(L){const r=await L.requestPermissions();return !r||r.display==="granted"}}catch(e){logErr("notif-perm",e.message||e)}return true}
+async function notifyNew(from,text,chatId){try{if(!C().notif)return;const showText=C().hidePrev?"New message":String(text||"New message").slice(0,200);const title=C().hidePrev?"Quantum Signal":from;try{const L=window.Capacitor&&Capacitor.Plugins&&Capacitor.Plugins.LocalNotifications;if(L){await L.schedule({notifications:[{id:Date.now()%2147483647,title,body:showText,extra:{chat:chatId}}]});return}}catch(e){logErr("notif-local",e.message||e)}try{if("Notification" in window&&Notification.permission==="granted"){const n=new Notification(title,{body:showText,tag:"qs-"+chatId});n.onclick=()=>{try{window.focus();n.close()}catch(e){}if(chatId){cur=chatId;view="chat";try{render()}catch(e){}}};return}}catch(e){logErr("notif-web",e.message||e)}try{if(navigator.vibrate)navigator.vibrate([120,60,120])}catch(e){}try{if("setAppBadge" in navigator)navigator.setAppBadge((S.chats||[]).reduce((a,c)=>a+(c.unread||0),0)).catch(()=>{})}catch(e){}if(document.hidden){document.title="● "+from+" — Quantum Signal";setTimeout(()=>{try{document.title="Quantum Signal"}catch(e){}},5000)}}catch(e){logErr("notify",e.message||e)}}
 async function tx(c,p){const e=await Net.enc(c.pub,JSON.stringify(p));await Net.j("/send",{method:"POST",body:JSON.stringify({from:C().user,to:c.id,...e})})}
 const PERM=/not found|bad message|too large|auth|bad key|invalid|inbox full/i;
 async function relay(c,m){if(busy.has(m.id))return;busy.add(m.id);m.lt=Date.now();try{await tx(c,{k:"m",id:m.id,t:m.t,q:m.q||undefined});m.st=Math.max(m.st||0,1);delete m.err;delete m.perm}catch(x){const e=Net.msg(x);m.st=-1;m.err=e;m.tries=(m.tries||0)+1;m.perm=PERM.test(e)?1:0;logErr("send",e);if(m.tries===1)toast(m.perm?"Couldn’t send: "+(/auth/i.test(e)?"the server doesn’t recognise your account":e):"No connection. Will retry automatically.")}busy.delete(m.id);save();renderMsgs()}
 async function markRead(c){if(!c||!c.pub||!C().receipts||document.hidden||locked)return;const ids=c.msgs.filter(m=>!m.me&&!m.rs).map(m=>m.id);if(!ids.length)return;c.msgs.forEach(m=>{if(!m.me)m.rs=1});save();try{await tx(c,{k:"r",ids})}catch(e){c.msgs.forEach(m=>{if(ids.includes(m.id))m.rs=0})}}
-async function pollOnce(){if(!C().token||locked)return;
+let pollFails=0,lastPollOk=0;const badIds=new Map();
+async function pollOnce(){if(!C().token)return;
 try{const ack=(S.ack||[]).slice(0,200);let d;
 try{if(legacyInbox)throw Object.assign(new Error("not found"),{status:404});d=await Net.j("/inbox",{method:"POST",body:JSON.stringify({u:C().user,wait:45,ack}),timeout:52000,ctl:(pollCtl=new AbortController())})}
 catch(x){if(x.message==="not found"&&x.status===404){legacyInbox=true;d=await Net.j("/inbox?u="+encodeURIComponent(C().user)+"&wait=25",{timeout:32000,ctl:(pollCtl=new AbortController())})}else throw x}
-online=true;if(!legacyInbox&&ack.length){S.ack=S.ack.filter(id=>!ack.includes(id));save()}const dl={};let bad=0;
+online=true;pollFails=0;lastPollOk=Date.now();if(!legacyInbox&&ack.length){S.ack=S.ack.filter(id=>!ack.includes(id));save()}const dl={};let bad=0;
 for(const e of d.m){let c=S.chats.find(x=>x.id===e.from);
 if(!c){try{c={id:e.from,name:e.from,msgs:[],dis:C().disap,ver:false,unread:0,pub:await Net.find(e.from)}}catch(x){bad++;continue}S.chats.push(c)}
-let p;try{const raw=await Net.dec(c.pub,e);try{p=JSON.parse(raw)}catch(x){}if(!p||!p.k)p={k:"m",id:uid(),t:raw}}catch(x){bad++;done(e.id);continue}
-if(p.k==="m"){if(!c.msgs.some(x=>x.id===p.id)){c.msgs.push({id:p.id,me:0,t:String(p.t),q:p.q||null,ts:e.ts,r:null,exp:c.dis?Date.now()+c.dis*1000:0});if(!(view==="chat"&&cur===c.id&&!document.hidden))c.unread++}(dl[c.id]=dl[c.id]||{c,ids:[]}).ids.push(p.id)}
+let p;try{const raw=await Net.dec(c.pub,e);try{p=JSON.parse(raw)}catch(x){}if(!p||!p.k)p={k:"m",id:uid(),t:raw}}catch(x){bad++;const n=(badIds.get(e.id)||0)+1;badIds.set(e.id,n);if(n>=3)done(e.id);continue}
+if(p.k==="m"){if(!c.msgs.some(x=>x.id===p.id)){c.msgs.push({id:p.id,me:0,t:String(p.t),q:p.q||null,ts:e.ts,r:null,exp:c.dis?Date.now()+c.dis*1000:0});if(!(view==="chat"&&cur===c.id&&!document.hidden)){c.unread++;notifyNew(c.name,String(p.t),c.id)}}(dl[c.id]=dl[c.id]||{c,ids:[]}).ids.push(p.id)}
 else if(p.k==="d"||p.k==="r"){(p.ids||[]).forEach(id=>{const m=c.msgs.find(x=>x.id===id&&x.me);if(m)m.st=Math.max(m.st??1,p.k==="d"?2:3)})}
 else if(p.k==="x"){const m=c.msgs.find(x=>x.id===p.id);if(m)m.r=p.r||null}done(e.id)}
-if(d.m.length){save();if(view==="chat")renderMsgs();else if(tab==="chats"&&document.activeElement.id!=="sq")render()}
+if(d.m.length){save();if(!locked){if(view==="chat")renderMsgs();else if(tab==="chats"&&document.activeElement.id!=="sq")render()}}
 if(bad)toast(bad+" message"+(bad>1?"s":"")+" couldn’t be decrypted");
 for(const k in dl)tx(dl[k].c,{k:"d",ids:dl[k].ids}).catch(()=>{});
-if(view==="chat")markRead(chat())}catch(e){online=false;if(!(e.name==="AbortError"&&pollCtl&&pollCtl.manual))logErr("poll",Net.msg(e));if(e.message==="auth"&&!authWarned){authWarned=true;toast("The server doesn’t recognise your account. Settings → Account → Reset server account.")}}}
+if(view==="chat")markRead(chat())}catch(e){online=false;pollFails++;if(pollFails===1)toast("No connection. Will keep retrying.");if(!(e.name==="AbortError"&&pollCtl&&pollCtl.manual))logErr("poll",Net.msg(e));if(e.message==="auth"&&!authWarned){authWarned=true;toast("The server doesn’t recognise your account. Settings → Account → Reset server account.")}}}
 function retryFailed(){if(!C().token||locked)return;S.chats.forEach(c=>c.pub&&c.msgs.forEach(m=>{if(m.me&&m.st===-1&&!m.perm&&(m.tries||0)<12&&Date.now()-(m.lt||0)>Math.min(2e3*2**(m.tries||0),6e4))relay(c,m)}));}
 setInterval(retryFailed,2000);
 let legacyInbox=false,pollCtl=null;
 function restartPoll(){if(pollCtl){pollCtl.manual=1;pollCtl.abort()}}
 function done(id){if(legacyInbox||!id)return;const a=S.ack||(S.ack=[]);if(!a.includes(id))a.push(id)}
 let inPoll=false;async function poll(){if(inPoll)return;inPoll=true;try{await pollOnce()}finally{inPoll=false}}
-setTimeout(async()=>{while(true){const t0=Date.now();try{await poll()}catch(e){}await new Promise(r=>setTimeout(r,Date.now()-t0<1500?2000:100))}},1000);
+setTimeout(async()=>{while(true){const t0=Date.now();try{await poll()}catch(e){logErr("poll-loop",e&&e.message||e)}const wait=pollFails>0?Math.min(30000,2000*Math.pow(2,Math.min(pollFails,4)))+Math.floor(Math.random()*1000):(Date.now()-t0<1500?2000:100);await new Promise(r=>setTimeout(r,wait))}},1000);
+setInterval(()=>{try{if(!C().token||inPoll||!lastPollOk)return;if(Date.now()-lastPollOk>75000){logErr("poll-watchdog","No successful poll for 75s — restarting");restartPoll();poll()}}catch(e){logErr("poll-watchdog",e.message||e)}},10000);
+addEventListener("online",()=>{try{online=true;pollFails=0;toast("Back online");restartPoll();poll()}catch(e){logErr("online",e.message||e)}});
+addEventListener("offline",()=>{online=false;logErr("offline","Device went offline")});
 A.bcol=v=>{C().bcol=v;save();applyTheme();render()};
 const newer=(a,b)=>{const x=String(a).split(".").map(Number),y=String(b).split(".").map(Number);for(let i=0;i<3;i++)if((x[i]||0)!==(y[i]||0))return(x[i]||0)>(y[i]||0);return false};
 async function copy(t){try{await navigator.clipboard.writeText(t);return true}catch(e){try{const a=document.createElement("textarea");a.value=t;a.style.cssText="position:fixed;opacity:0";document.body.append(a);a.select();const ok=document.execCommand("copy");a.remove();return ok}catch(x){return false}}}
@@ -318,7 +332,7 @@ const ERR=[];let authWarned=false,lastAct=Date.now();
 function logErr(w,m){ERR.push({t:Date.now(),w,m:String(m&&m.message||m).slice(0,160)});if(ERR.length>30)ERR.shift()}
 addEventListener("error",e=>logErr("js",(e.message||"error")+(e.lineno?" (line "+e.lineno+")":"")));
 addEventListener("unhandledrejection",e=>logErr("promise",e.reason));
-["pointerdown","keydown","touchstart"].forEach(t=>addEventListener(t,()=>{lastAct=Date.now()},{passive:true}));
+["pointerdown","keydown","touchstart"].forEach(t=>addEventListener(t,()=>{lastAct=Date.now();acquireWakeLock()},{passive:true}));
 async function keyCheck(c){if(!c||!c.pub||!C().keyAlert||!C().server)return;try{const p=await Net.find(c.id);if(p.x!==c.pub.x||p.y!==c.pub.y)sheet("Safety number changed",[["Trust new key",()=>{c.pub=p;c.ver=false;save();render()}],["Keep old key",()=>{}]],`<p class="hint">${E(c.name)}’s encryption key is different from before. This happens when they reinstall the app, or if someone is intercepting your chat. Check their safety number before trusting it.</p>`)}catch(e){}}
 const DEF={autolock:30,disap:0,theme:"system",font:16,bshape:"signal",inc:"plain",ts:"group",idle:0,keep:0};
 async function diag(){toast("Checking…");const L=[],F=[],cfg=C();let reset=0;const add=(k,n,d="")=>L.push({k,n,d});
