@@ -30,8 +30,8 @@ nav button.on{color:var(--acc);font-weight:600}
 .ch{border-bottom:1px solid var(--ln)}
 .who{flex:1;display:flex;align-items:center;gap:10px;cursor:pointer;min-width:0}
 .who b{display:block;font-size:16px}
-#msgs{flex:1;overflow-y:auto;padding:12px 12px 18px;display:flex;flex-direction:column;gap:5px;background:var(--bg)}
-.b{max-width:78%;padding:8px 12px;border-radius:18px;font-size:var(--fs);line-height:1.35;position:relative;word-wrap:break-word;margin-bottom:2px}
+#msgs{flex:1;overflow-y:auto;padding:10px 10px 14px;display:flex;flex-direction:column;gap:3px;background:var(--bg)}
+.b{max-width:75%;padding:5px 10px;border-radius:18px;font-size:var(--fs);line-height:1.25;position:relative;word-wrap:break-word;margin-bottom:0}
 .out{align-self:flex-end;background:var(--acc);color:#fff;border-bottom-right-radius:6px}
 .in{align-self:flex-start;background:var(--in);border-bottom-left-radius:6px}
 .b small{display:block;font-size:11px;opacity:.75;text-align:right;margin-top:2px;color:inherit}
@@ -70,13 +70,16 @@ body.priv::after{content:"Quantum Signal";position:fixed;inset:0;background:var(
 .b{border-radius:var(--rad,18px)}.out{border-bottom-right-radius:6px}.in{border-bottom-left-radius:6px}#msgs{background:var(--wall,var(--bg))}
 .out{background:var(--bo,var(--acc))}
 :root[data-inc="tint"] .in{background:color-mix(in srgb,var(--acc) 16%,var(--bg))}
-.b{border-radius:var(--rad,18px);margin:0;padding:7px 12px 6px;line-height:1.3;overflow-wrap:anywhere}
+.b{border-radius:var(--rad,18px);margin:0;padding:5px 10px 4px;line-height:1.25;overflow-wrap:anywhere}
 .b::after{content:"";display:block;clear:both}
 .tx{white-space:pre-wrap}
-.mt{float:right;display:inline-flex;align-items:center;gap:3px;font-size:11px;opacity:.85;margin:5px 0 -3px 12px;user-select:none}
+.mt{float:right;display:inline-flex;align-items:center;gap:2px;font-size:10px;opacity:.9;margin:3px 0 -2px 8px;user-select:none}
+.tk{width:12px;height:12px;flex:none}
+.tk.dl{opacity:.7}
+.tk.rd{width:13px;height:13px;filter:drop-shadow(0 0 2px rgba(255,255,255,.9))}
 .in .mt{color:var(--mu);opacity:1}
 .out.gp{border-top-right-radius:4px}.out.gn{border-bottom-right-radius:4px}.in.gp{border-top-left-radius:4px}.in.gn{border-bottom-left-radius:4px}
-.b.gn{margin-bottom:-3px}
+.b.gn{margin-bottom:-2px}
 .day{align-self:center;font-size:12px;color:var(--mu);background:var(--sf);padding:3px 10px;border-radius:10px;margin:8px 0}
 .upc{display:flex;align-items:center;justify-content:space-between;gap:12px;margin:10px 16px 4px;padding:14px 16px;border-radius:16px;background:var(--sf);border:1px solid var(--ln)}
 .upc b{display:block;font-size:16px}
@@ -218,7 +221,7 @@ Object.assign(PK,{bshape:{t:"Bubble shape",o:[["signal","Signal (rounded, groupe
 const BC=["","#2c6bed","#6d4df2","#d6336c","#1f9d6b","#e8590c","#343a40"];
 const uid=()=>Date.now().toString(36)+Math.random().toString(36).slice(2,8),busy=new Set();let online=null;
 const dayLbl=t=>new Date(t).toDateString()===new Date().toDateString()?"Today":new Date(t).toLocaleDateString([],{weekday:"long",month:"short",day:"numeric"});
-const tick=st=>`<svg class="tk" width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">${st===-1?'<circle cx="8" cy="8" r="6.5" stroke="#ff9a9a"/><path d="M8 4.6v4M8 11.2v.1" stroke="#ff9a9a"/>':st===0?'<circle cx="8" cy="8" r="6.5" stroke-dasharray="2 2.4"/>':st===1?'<circle cx="8" cy="8" r="6.5"/><path d="M5 8.2l2 2 3.6-4"/>':st===2?'<circle cx="8" cy="8" r="6.5"/><path d="M3.8 8.2l2 2 3-3.4M7 9.6l.4.4 3.8-4.4"/>':'<circle cx="8" cy="8" r="7" fill="currentColor"/><path d="M3.8 8.2l2 2 3-3.4M7 9.6l.4.4 3.8-4.4" stroke="var(--bo,var(--acc))"/>'}</svg>`;
+const tick=st=>`<svg class="tk ${st===2?'dl':st===3?'rd':''}" width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">${st===-1?'<circle cx="8" cy="8" r="6.5" stroke="#ff9a9a"/><path d="M8 4.6v4M8 11.2v.1" stroke="#ff9a9a"/>':st===0?'<circle cx="8" cy="8" r="6.5" stroke-dasharray="2 2.4"/>':st===1?'<circle cx="8" cy="8" r="6.5"/><path d="M5 8.2l2 2 3.6-4"/>':st===2?'<circle cx="8" cy="8" r="6.5"/><path d="M3.8 8.2l2 2 3-3.4M7 9.6l.4.4 3.8-4.4"/>':'<circle cx="8" cy="8" r="7" fill="currentColor"/><path d="M3.8 8.2l2 2 3-3.4M7 9.6l.4.4 3.8-4.4" stroke="var(--bo,var(--acc))" stroke-width="2"/>'}</svg>`;
 async function tx(c,p){const e=await Net.enc(c.pub,JSON.stringify(p));await Net.j("/send",{method:"POST",body:JSON.stringify({from:C().user,to:c.id,...e})})}
 const PERM=/not found|bad message|too large|auth|bad key|invalid|inbox full/i;
 async function relay(c,m){if(busy.has(m.id))return;busy.add(m.id);m.lt=Date.now();try{await tx(c,{k:"m",id:m.id,t:m.t,q:m.q||undefined});m.st=Math.max(m.st||0,1);delete m.err;delete m.perm}catch(x){const e=Net.msg(x);m.st=-1;m.err=e;m.tries=(m.tries||0)+1;m.perm=PERM.test(e)?1:0;logErr("send",e);if(m.tries===1)toast(m.perm?"Couldn’t send: "+(/auth/i.test(e)?"the server doesn’t recognise your account":e):"No connection. Will retry automatically.")}busy.delete(m.id);save();renderMsgs()}
