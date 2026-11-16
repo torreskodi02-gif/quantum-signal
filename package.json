@@ -1,1 +1,20 @@
-{"dependencies":{"@capacitor/android":"^6.1.0","@capacitor/app":"^6.0.0","@capacitor/browser":"^6.0.0","@capacitor/core":"^6.1.0","@capacitor/local-notifications":"^6.1.0","@capacitor/push-notifications":"^6.0.5","@capawesome-team/capacitor-android-battery-optimization":"^6.0.0","@capawesome-team/capacitor-android-foreground-service":"^6.2.0","capacitor-native-biometric":"^4.2.2"},"devDependencies":{"@capacitor/cli":"^6.1.0"},"name":"quantum-signal","private":true,"version":"0.8.7"}
+{
+  "dependencies": {
+    "@capacitor/android": "^6.1.0",
+    "@capacitor/app": "^6.0.0",
+    "@capacitor/browser": "^6.0.0",
+    "@capacitor/core": "^6.1.0",
+    "@capacitor/local-notifications": "^6.1.0",
+    "@capacitor/push-notifications": "^6.0.5",
+    "@capawesome-team/capacitor-android-battery-optimization": "^6.0.0",
+    "@capawesome-team/capacitor-android-foreground-service": "^6.2.0",
+    "capacitor-native-biometric": "^4.2.2",
+    "qs-manifest": "file:plugins/qs-manifest"
+  },
+  "devDependencies": {
+    "@capacitor/cli": "^6.1.0"
+  },
+  "name": "quantum-signal",
+  "private": true,
+  "version": "0.8.9"
+}
