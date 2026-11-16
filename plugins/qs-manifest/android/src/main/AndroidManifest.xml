@@ -1,4 +1,6 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- Exact alarms: lets LocalNotifications schedule exact notifications. -->
+    <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" />
     <!-- Foreground service: keeps the app alive in the background so it can
          keep polling for messages. remoteMessaging matches serviceType 512
          used by the app's fgStart(). -->

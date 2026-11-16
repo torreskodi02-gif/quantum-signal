@@ -23,6 +23,7 @@ export default{
 
 export class Hub{
   constructor(state,env){
+    this.state=state;this.env=env;this.fcmTok=null;this.fcmTokExp=0;this.fcmProj=null;
     this.sql=state.storage.sql;this.waiters=new Map();this.hits=new Map();this.regs=new Map();this.logins=new Map();this.fails=new Map();this.backs=new Map();
     state.blockConcurrencyWhile(async()=>{
       this.run('CREATE TABLE IF NOT EXISTS users(name TEXT PRIMARY KEY,pub TEXT NOT NULL,th TEXT NOT NULL,at INTEGER NOT NULL,ah TEXT,vault TEXT)');
@@ -31,6 +32,7 @@ export class Hub{
       this.run('CREATE INDEX IF NOT EXISTS tokens_user ON tokens(user,at)');
       this.run('CREATE TABLE IF NOT EXISTS box(id TEXT PRIMARY KEY,to_user TEXT NOT NULL,from_user TEXT NOT NULL,ct TEXT NOT NULL,iv TEXT NOT NULL,ts INTEGER NOT NULL)');
       this.run('CREATE TABLE IF NOT EXISTS backups(user TEXT PRIMARY KEY,data TEXT NOT NULL,iv TEXT NOT NULL,ts INTEGER NOT NULL)');
+      this.run('CREATE TABLE IF NOT EXISTS push_tokens(user TEXT NOT NULL,token TEXT NOT NULL,updated INTEGER NOT NULL,PRIMARY KEY(user,token))');
       this.run('CREATE INDEX IF NOT EXISTS box_to ON box(to_user,ts)');
     });
   }
@@ -46,6 +48,44 @@ export class Hub{
   failed(u){const f=this.fails.get(u)||{n:0,t:0};if(Date.now()-f.t>9e5)f.n=0;return f}
   bad(u,f){f.n++;f.t=Date.now();if(this.fails.size>5000)this.fails.clear();this.fails.set(u,f)}
   notify(u){const s=this.waiters.get(u);if(s)for(const f of[...s])f()}
+
+  // --- FCM push: notify a closed app. The server only sees ciphertext,
+  // so the push carries just the sender's name, never message content.
+  // Needs the Firebase service account key as the FCM_KEY secret (JSON).
+  // If it is not configured, pushes are skipped silently. ---
+  b64url(u){let s='';for(let i=0;i<u.length;i++)s+=String.fromCharCode(u[i]);return btoa(s).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'')}
+  async fcmAccess(){
+    if(this.fcmTok&&Date.now()<this.fcmTokExp-60000)return this.fcmTok;
+    const raw=this.env&&this.env.FCM_KEY;if(!raw)return null;
+    let sa;try{sa=JSON.parse(raw)}catch(e){return null}
+    if(!sa||!sa.project_id||!sa.client_email||!sa.private_key)return null;
+    const now=Math.floor(Date.now()/1000);
+    const head=this.b64url(new TextEncoder().encode(JSON.stringify({alg:'RS256',typ:'JWT'})));
+    const body=this.b64url(new TextEncoder().encode(JSON.stringify({iss:sa.client_email,scope:'https://www.googleapis.com/auth/firebase.messaging',aud:'https://oauth2.googleapis.com/token',exp:now+3600,iat:now})));
+    const pem=sa.private_key.replace(/-----BEGIN PRIVATE KEY-----/g,'').replace(/-----END PRIVATE KEY-----/g,'').replace(/\s+/g,'');
+    let der;try{der=Uint8Array.from(atob(pem),c=>c.charCodeAt(0))}catch(e){return null}
+    let key;try{key=await crypto.subtle.importKey('pkcs8',der,{name:'RSASSA-PKCS1-v1_5',hash:'SHA-256'},false,['sign'])}catch(e){return null}
+    const sig=await crypto.subtle.sign('RSASSA-PKCS1-v1_5',key,new TextEncoder().encode(head+'.'+body));
+    const jwt=head+'.'+body+'.'+this.b64url(new Uint8Array(sig));
+    let res;try{res=await fetch('https://oauth2.googleapis.com/token',{method:'POST',headers:{'content-type':'application/x-www-form-urlencoded'},body:'grant_type='+encodeURIComponent('urn:ietf:params:oauth:grant-type:jwt-bearer')+'&assertion='+encodeURIComponent(jwt)})}catch(e){return null}
+    if(!res.ok)return null;
+    const d=await res.json().catch(()=>null);if(!d||!d.access_token)return null;
+    this.fcmTok=d.access_token;this.fcmTokExp=Date.now()+(d.expires_in||3600)*1000;this.fcmProj=sa.project_id;
+    return this.fcmTok;
+  }
+  async pushNotify(to,from){
+    try{
+      const toks=this.run('SELECT token FROM push_tokens WHERE user=?',to);
+      if(!toks.length)return;
+      const acc=await this.fcmAccess();if(!acc||!this.fcmProj)return;
+      for(const r of toks){
+        try{
+          const res=await fetch('https://fcm.googleapis.com/v1/'+this.fcmProj+'/messages:send',{method:'POST',headers:{'content-type':'application/json','authorization':'Bearer '+acc},body:JSON.stringify({message:{token:r.token,notification:{title:'@'+from,body:'New message'},data:{chat:from},android:{priority:'high'}}})});
+          if(!res.ok){const t=await res.text().catch(()=> '');if(/UNREGISTERED|NOT_FOUND|INVALID_ARGUMENT/i.test(t))this.run('DELETE FROM push_tokens WHERE token=?',r.token)}
+        }catch(e){}
+      }
+    }catch(e){}
+  }
 
   async fetch(req){
     try{
@@ -119,6 +159,23 @@ export class Hub{
         return reply({pub:JSON.parse(r.pub)});
       }
 
+      if(p==='/push-token'&&req.method==='POST'){
+        const{u,token}=parse(raw);
+        await this.auth(u,t);
+        if(!str(token,512))throw new HttpErr(400,'bad token');
+        this.run('INSERT OR REPLACE INTO push_tokens(user,token,updated) VALUES(?,?,?)',u,token,Date.now());
+        this.run('DELETE FROM push_tokens WHERE user=? AND token NOT IN (SELECT token FROM push_tokens WHERE user=? ORDER BY updated DESC LIMIT 5)',u,u);
+        return reply({ok:true});
+      }
+
+      if(p==='/push-token'&&req.method==='DELETE'){
+        const{u,token}=parse(raw);
+        await this.auth(u,t);
+        if(token)this.run('DELETE FROM push_tokens WHERE user=? AND token=?',u,token);
+        else this.run('DELETE FROM push_tokens WHERE user=?',u);
+        return reply({ok:true});
+      }
+
       if(p==='/send'&&req.method==='POST'){
         const{from,to,ct,iv}=parse(raw);
         await this.auth(from,t);
@@ -129,6 +186,7 @@ export class Hub{
         this.run('INSERT INTO box(id,to_user,from_user,ct,iv,ts) VALUES(?,?,?,?,?,?)',id,to,from,ct,iv,Date.now());
         if(Math.random()<0.02)this.run('DELETE FROM box WHERE ts<?',Date.now()-TTL);
         this.notify(to);
+        try{if(this.state&&this.state.waitUntil)this.state.waitUntil(this.pushNotify(to,from));else this.pushNotify(to,from).catch(()=>{})}catch(e){}
         return reply({ok:true,id});
       }
 
