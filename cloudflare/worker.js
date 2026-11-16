@@ -3,7 +3,8 @@
 // Same API as the Node server, so the app works with either. Runs 24/7 on Cloudflare's network over HTTPS.
 const NAME=/^[a-z0-9_]{3,20}$/,TTL=7*864e5,BOX_MAX=500;
 const CORS={'access-control-allow-origin':'*','access-control-allow-headers':'content-type,x-token','access-control-allow-methods':'GET,POST,OPTIONS','access-control-max-age':'86400'};
-const reply=(o,c=200)=>new Response(JSON.stringify(o),{status:c,headers:{'content-type':'application/json',...CORS}});
+const SEC={'strict-transport-security':'max-age=31536000; includeSubDomains','x-content-type-options':'nosniff','x-frame-options':'DENY','referrer-policy':'no-referrer','cache-control':'no-store'};
+const reply=(o,c=200)=>new Response(JSON.stringify(o),{status:c,headers:{'content-type':'application/json',...CORS,...SEC}});
 class HttpErr extends Error{constructor(c,m){super(m);this.code=c}}
 const str=(v,m)=>typeof v==='string'&&v.length>0&&v.length<=m;
 const hex=async s=>[...new Uint8Array(await crypto.subtle.digest('SHA-256',new TextEncoder().encode(String(s))))].map(b=>b.toString(16).padStart(2,'0')).join('');
@@ -15,7 +16,7 @@ const parse=raw=>{try{return JSON.parse(raw||'{}')}catch(e){throw new HttpErr(40
 
 export default{
   async fetch(req,env){
-    if(req.method==='OPTIONS')return new Response(null,{status:204,headers:CORS});
+    if(req.method==='OPTIONS')return new Response(null,{status:204,headers:{...CORS,...SEC}});
     try{return await env.HUB.get(env.HUB.idFromName('main')).fetch(req)}
     catch(e){return reply({e:'server busy, try again'},503)}
   }
@@ -24,7 +25,7 @@ export default{
 export class Hub{
   constructor(state,env){
     this.state=state;this.env=env;this.fcmTok=null;this.fcmTokExp=0;this.fcmProj=null;
-    this.sql=state.storage.sql;this.waiters=new Map();this.hits=new Map();this.regs=new Map();this.logins=new Map();this.fails=new Map();this.backs=new Map();
+    this.sql=state.storage.sql;this.waiters=new Map();this.hits=new Map();this.regs=new Map();this.logins=new Map();this.fails=new Map();this.backs=new Map();this.sends=new Map();
     state.blockConcurrencyWhile(async()=>{
       this.run('CREATE TABLE IF NOT EXISTS users(name TEXT PRIMARY KEY,pub TEXT NOT NULL,th TEXT NOT NULL,at INTEGER NOT NULL,ah TEXT,vault TEXT)');
       for(const c of['ah TEXT','vault TEXT']){try{this.run('ALTER TABLE users ADD COLUMN '+c)}catch(e){}}   // older databases
@@ -181,6 +182,7 @@ export class Hub{
       if(p==='/send'&&req.method==='POST'){
         const{from,to,ct,iv}=parse(raw);
         await this.auth(from,t);
+        if(this.limited(this.sends,from,60,6e4))throw new HttpErr(429,'slow down');
         if(!this.user(to))throw new HttpErr(404,'not found');
         if(!str(ct,60000)||!str(iv,40))throw new HttpErr(400,'bad message');
         if(this.run('SELECT COUNT(*) AS c FROM box WHERE to_user=?',to)[0].c>=BOX_MAX)throw new HttpErr(429,'recipient inbox full');
