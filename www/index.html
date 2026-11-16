@@ -126,8 +126,9 @@ const PK={autolock:{t:"Auto-lock",o:[[0,"Immediately"],[30,"After 30 seconds"],[
 const ACC=["#3a76f0","#6d4df2","#e0457b","#2fa36b","#e08a1e","#0e9fb5"];
 const fmt=t=>new Date(t).toLocaleTimeString([],{hour:"numeric",minute:"2-digit"});
 const fday=t=>new Date(t).toDateString()===new Date().toDateString()?fmt(t):new Date(t).toLocaleDateString([],{weekday:"short"});
-function seed(){return{mig:3,cfg:{server:CF,pin:null,bio:true,autolock:30,screenSec:true,receipts:true,notif:true,bg:true,permAsked:false,pushOn:false,backup:true,incog:true,wipe10:false,theme:"system",acc:"#3a76f0",font:16,disap:0,cred:null,skin:"signal",bshape:"signal",bcol:"",inc:"plain",ts:"group"},chats:[{id:"Note to Self",name:"Note to Self",msgs:[],dis:0,ver:false,unread:0}]}}
+function seed(){return{mig:3,cfg:{server:CF,pin:null,bio:true,autolock:30,screenSec:true,receipts:true,notif:true,bg:true,permAsked:false,pushOn:false,backup:true,permOff:false,incog:true,wipe10:false,theme:"system",acc:"#3a76f0",font:16,disap:0,cred:null,skin:"signal",bshape:"signal",bcol:"",inc:"plain",ts:"group"},chats:[{id:"Note to Self",name:"Note to Self",msgs:[],dis:0,ver:false,unread:0}]}}
 let S,view="list",tab="chats",cur=null,q="",reply=null,locked=true,pin="",stage=0,first="",tries=0,until=0,hid=0;
+let PERM_ST=null;
 const C=()=>S.cfg,chat=()=>S.chats.find(c=>c.id===cur),last=c=>c.msgs.length?c.msgs[c.msgs.length-1].ts:0;
 let saveCount=0;
 function save(){saveCount++;try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){}try{Backup.mark()}catch(e){}}
@@ -207,7 +208,7 @@ const Backup={
   }
 };
 
-function load(){try{S=JSON.parse(localStorage.getItem(KEY))}catch(e){S=null}if(!S||!S.cfg)S=seed();S.cfg=Object.assign({bshape:"signal",bcol:"",inc:"plain",ts:"group",skin:"signal",notif:true,bg:true,permAsked:false,pushOn:false,backup:true,twofa:false,idle:0,keyAlert:true,hidePrev:false,clipClear:false,keep:0,servers:[],autoSwitch:true},S.cfg);if(!S.cfg.server)S.cfg.server=CF;if(S.mig!==3){S.chats=S.chats.filter(c=>c.pub||c.id==="Note to Self");const n=S.chats.find(c=>c.id==="Note to Self");if(n&&n.msgs.length===1&&n.msgs[0].t.startsWith("Ideas:"))n.msgs=[];S.mig=3;save()}}
+function load(){try{S=JSON.parse(localStorage.getItem(KEY))}catch(e){S=null}if(!S||!S.cfg)S=seed();S.cfg=Object.assign({bshape:"signal",bcol:"",inc:"plain",ts:"group",skin:"signal",notif:true,bg:true,permAsked:false,pushOn:false,backup:true,permOff:false,twofa:false,idle:0,keyAlert:true,hidePrev:false,clipClear:false,keep:0,servers:[],autoSwitch:true},S.cfg);if(!S.cfg.server)S.cfg.server=CF;if(S.mig!==3){S.chats=S.chats.filter(c=>c.pub||c.id==="Note to Self");const n=S.chats.find(c=>c.id==="Note to Self");if(n&&n.msgs.length===1&&n.msgs[0].t.startsWith("Ideas:"))n.msgs=[];S.mig=3;save()}}
 function applyTheme(){const r=document.documentElement;r.dataset.theme=C().theme==="system"?"":C().theme;r.style.setProperty("--acc",C().acc);r.style.setProperty("--fs",C().font+"px");const k=SK[C().skin]||SK.signal;r.style.setProperty("--rad",k.rad+"px");r.style.setProperty("--wall",k.wall||"var(--bg)");k.wall==="#000"?r.style.setProperty("--bg","#000"):r.style.removeProperty("--bg");document.body.style.fontFamily=k.f||"";r.style.setProperty("--bo",C().bcol||"var(--acc)");r.style.setProperty("--rad",({signal:18,soft:24,sharp:6})[C().bshape||"signal"]+"px");r.dataset.inc=C().inc||"plain"}
 function toast(t){const d=document.createElement("div");d.className="toast";d.textContent=t;document.body.append(d);setTimeout(()=>d.remove(),2400)}
 function sheet(t,items,html=""){const d=document.createElement("div");d.className="sh";d.innerHTML=`<div class="bx"><h4>${t}</h4>${html}${items.map((x,i)=>`<button data-i="${i}">${x[0]}</button>`).join("")}</div>`;d.onclick=e=>{const b=e.target.closest("button");if(b){d.remove();items[b.dataset.i][1]()}else if(e.target===d)d.remove()};document.body.append(d)}
@@ -233,7 +234,7 @@ function lockHTML(){const c=C(),mk=!c.pin;return`<div class="lock"><div class="l
 function rows(){const l=S.chats.filter(c=>c.name.toLowerCase().includes(q.toLowerCase())).sort((a,b)=>last(b)-last(a));return l.map(c=>{const m=c.msgs[c.msgs.length-1];return`<div class="it" data-a="open" data-v="${E(c.id)}">${av(c.name,48)}<div class="m"><b>${E(c.name)}${c.ver?" ✓":""}</b><span>${m?(C().hidePrev?"Message":(m.me?"You: ":"")+E(m.t)):"No messages yet"}</span></div><div class="r">${m?fday(m.ts):""}${c.dis?"⏱":""}${c.unread?`<i class="bd">${c.unread}</i>`:""}</div></div>`}).join("")+(S.chats.length<2&&!q?'<p class="hint">Tap the pencil to find someone by username and start an encrypted chat.</p>':"")||'<p class="hint">No chats found.</p>'}
 function listHTML(){const T={chats:"Quantum Signal",calls:"Calls",set:"Settings"};
 const nav=[["chats","Chats","msg"],["set","Settings","gear"]].map(t=>`<button data-a="tab" data-v="${t[0]}" class="${tab===t[0]?"on":""}">${ic(t[2])}<span>${t[1]}${t[0]==="set"&&UP.s==="avail"?'<b style="color:#e5484d"> ●</b>':""}</span></button>`).join("");
-let b="";if(tab==="chats")b=`<input id="sq" class="srch" placeholder="Search" value="${E(q)}" autocomplete="off"><div id="cl">${rows()}</div><button class="fab" data-a="newchat" aria-label="New message">${ic("edit",24)}</button>`;
+let b="";if(tab==="chats")b=setupBanner()+`<input id="sq" class="srch" placeholder="Search" value="${E(q)}" autocomplete="off"><div id="cl">${rows()}</div><button class="fab" data-a="newchat" aria-label="New message">${ic("edit",24)}</button>`;
 else b=setHTML();
 return`<header>${tab==="chats"?`<button data-a="tab" data-v="set" aria-label="Profile">${av("You",34)}</button>`:""}<h1>${T[tab]}</h1>${tab==="chats"?`<button data-a="lock" aria-label="Lock now">${ic("lock")}</button>`:""}</header>${b}<nav>${nav}</nav>`}
 function setHTML(){const c=C();
@@ -257,7 +258,7 @@ el.innerHTML=h;el.scrollTop=el.scrollHeight}
 function safety(c){let h=H(c.name+"qs"),o=[];for(let i=0;i<12;i++){h=(h*1103515245+12345)>>>0;o.push(String(h%100000).padStart(5,"0"))}return o}
 function send(){const i=$("#inp"),t=i.value.trim();if(!t)return;if(t.length>4000)return toast("Message too long (4000 characters max)");const c=chat(),m={id:uid(),me:1,t,ts:Date.now(),r:null,q:reply,st:c.pub?0:1,exp:c.dis?Date.now()+c.dis*1000:0};c.msgs.push(m);reply=null;i.value="";$("#rp").innerHTML="";save();renderMsgs();if(c.pub)relay(c,m)}
 function msg(t){const m=$("#lm");if(m)m.textContent=t}
-function unlock(){locked=false;view="list";render();acquireWakeLock();restartPoll();poll();setTimeout(offerCF,900)}
+function unlock(){locked=false;view="list";render();acquireWakeLock();restartPoll();poll();refreshPerms();setTimeout(()=>askPerms(),600);setTimeout(offerCF,900)}
 function wipe(){try{localStorage.removeItem(KEY)}catch(e){}S=seed();applyTheme();locked=true;pin="";stage=0;view="list";tab="chats";render()}
 const A={
 tab(v){tab=v;render()},
@@ -299,9 +300,9 @@ panic(){sheet("Wipe all data?",[["Yes, wipe everything now",wipe]],'<p class="hi
 document.addEventListener("click",e=>{const el=e.target.closest("[data-a]");if(el&&A[el.dataset.a])A[el.dataset.a](el.dataset.v)});
 document.addEventListener("input",e=>{if(e.target.id==="sq"){q=e.target.value;$("#cl").innerHTML=rows()}});
 document.addEventListener("keydown",e=>{if(e.key==="Enter"&&e.target.id==="inp")send();if(e.key==="Enter"&&["au","ap","ap2"].includes(e.target.id))A.authgo()});
-document.addEventListener("visibilitychange",()=>{try{if(document.hidden){hid=Date.now();releaseWakeLock();dlog("vis","app hidden — starting background service");fgStart();if(Backup.dirty)Backup.upload(true);if(C().screenSec)document.body.classList.add("priv")}else{document.body.classList.remove("priv");document.title="Quantum Signal";try{if("clearAppBadge" in navigator)navigator.clearAppBadge().catch(()=>{})}catch(e){}acquireWakeLock();fgStop();dlog("vis","app visible");chkUp();if(!locked&&C().pin&&(Date.now()-hid)/1000>=C().autolock){locked=true;pin="";render()}else if(!locked){restartPoll();poll()}}}catch(e){logErr("visibility",e.message||e)}});
+document.addEventListener("visibilitychange",()=>{try{if(document.hidden){hid=Date.now();releaseWakeLock();dlog("vis","app hidden — starting background service");fgStart();if(Backup.dirty)Backup.upload(true);if(C().screenSec)document.body.classList.add("priv")}else{document.body.classList.remove("priv");document.title="Quantum Signal";try{if("clearAppBadge" in navigator)navigator.clearAppBadge().catch(()=>{})}catch(e){}acquireWakeLock();fgStop();dlog("vis","app visible");chkUp();refreshPerms();if(!locked&&C().pin&&(Date.now()-hid)/1000>=C().autolock){locked=true;pin="";render()}else if(!locked){restartPoll();poll()}}}catch(e){logErr("visibility",e.message||e)}});
 setInterval(()=>{const n=Date.now();let ch=0;if(!locked&&C().pin&&C().idle&&n-lastAct>C().idle*6e4){locked=true;pin="";render()}S.chats.forEach(c=>{const k=c.msgs.length;c.msgs=c.msgs.filter(m=>(!m.exp||m.exp>n)&&(!C().keep||n-m.ts<C().keep*864e5));if(c.msgs.length!==k)ch=1});if(ch&&!locked){save();view==="chat"?renderMsgs():render()}},1000);
-const VER="0.8.7";
+const VER="0.8.8";
 const APK_URL="https://github.com/torreskodi02-gif/quantum-signal/releases/download/latest/quantum-signal.apk";
 const SK={signal:{n:"Signal",acc:"#3a76f0",rad:18,wall:"",f:""},ios:{n:"iOS",acc:"#0a84ff",rad:20,wall:"",f:"-apple-system,BlinkMacSystemFont,'SF Pro Text',system-ui,sans-serif"},midnight:{n:"Midnight (OLED)",acc:"#8b5cf6",rad:16,wall:"#000",f:"",dark:1},aurora:{n:"Aurora",acc:"#14b8a6",rad:22,wall:"linear-gradient(160deg,#0f2027,#203a43,#2c5364)",f:"",dark:1},sunset:{n:"Sunset",acc:"#f97316",rad:20,wall:"linear-gradient(160deg,#fff1e6,#ffe0f0)",f:"",light:1}};
 /* End-to-end encryption: ECDH P-256 key agreement + AES-GCM. Server only ever sees ciphertext. */
@@ -332,7 +333,7 @@ const tick=st=>`<svg class="tk ${st===2?'dl':st===3?'rd':''}" width="12" height=
 let wakeLock=null;
 async function acquireWakeLock(){try{if(!("wakeLock" in navigator)||document.hidden)return;if(wakeLock)return;wakeLock=await navigator.wakeLock.request("screen");dlog("wake","screen lock acquired");wakeLock.addEventListener("release",()=>{wakeLock=null;dlog("wake","screen lock released")})}catch(e){wakeLock=null;logErr("wakelock",e.message||e)}}
 function releaseWakeLock(){try{if(wakeLock){wakeLock.release();wakeLock=null}}catch(e){wakeLock=null}}
-async function reqNotifPerm(){try{if("Notification" in window){if(Notification.permission==="granted")return true;if(Notification.permission==="denied")return false;return (await Notification.requestPermission())==="granted"}}catch(e){logErr("notif-perm",e.message||e)}try{const L=window.Capacitor&&Capacitor.Plugins&&Capacitor.Plugins.LocalNotifications;if(L){const r=await L.requestPermissions();return !r||r.display==="granted"}}catch(e){logErr("notif-perm",e.message||e)}return true}
+async function reqNotifPerm(){try{const L=window.Capacitor&&Capacitor.Plugins&&Capacitor.Plugins.LocalNotifications;if(L){const r=await L.requestPermissions();return !!(r&&r.display==="granted")}}catch(e){logErr("notif-perm",e.message||e)}try{if("Notification" in window){if(Notification.permission==="granted")return true;if(Notification.permission==="denied")return false;return (await Notification.requestPermission())==="granted"}}catch(e){logErr("notif-perm",e.message||e)}return true}
 async function notifyNew(from,text,chatId){try{if(!C().notif){dlog("notif","off — toggle disabled");return}const showText=C().hidePrev?"New message":String(text||"New message").slice(0,200);const title=C().hidePrev?"Quantum Signal":from;try{const L=window.Capacitor&&Capacitor.Plugins&&Capacitor.Plugins.LocalNotifications;if(L){await L.schedule({notifications:[{id:Date.now()%2147483647,title,body:showText,extra:{chat:chatId}}]});dlog("notif","local shown: "+title);return}}catch(e){logErr("notif-local",e.message||e)}try{if("Notification" in window&&Notification.permission==="granted"){const n=new Notification(title,{body:showText,tag:"qs-"+chatId});n.onclick=()=>{try{window.focus();n.close()}catch(e){}if(chatId){cur=chatId;view="chat";try{render()}catch(e){}}};dlog("notif","web shown: "+title);return}}catch(e){logErr("notif-web",e.message||e)}try{if(navigator.vibrate)navigator.vibrate([120,60,120])}catch(e){}try{if("setAppBadge" in navigator)navigator.setAppBadge((S.chats||[]).reduce((a,c)=>a+(c.unread||0),0)).catch(()=>{})}catch(e){}dlog("notif","fallback only (vibrate/badge) — no notification channel");if(document.hidden){document.title="● "+from+" — Quantum Signal";setTimeout(()=>{try{document.title="Quantum Signal"}catch(e){}},5000)}}catch(e){logErr("notify",e.message||e)}}
 /* Background service: when the app goes to the background, start an Android
    foreground service (with its own small persistent notification) so Android
@@ -505,6 +506,7 @@ const Perms={
   async sheet(){
     toast("Checking permissions…");
     const st=await this.status();
+    PERM_ST=st;
     const row=(name,state,good,bad)=>`<div class="row" style="cursor:default"><div><b>${name}</b><small>${state}</small></div><span style="font-size:13px;color:${good?"#1f9d6b":"#e8590c"};font-weight:700">${good?"✓ Allowed":"✗ "+bad}</span></div>`;
     const n=st.notif,ng=n==="granted";
     const html=row("Notifications",ng?"Allowed — you’ll be told about new messages right away":n==="denied"?"Blocked — turn it on in your phone’s Settings → Apps → Quantum Signal → Notifications":"Not asked yet",ng,"Not allowed")
@@ -521,15 +523,34 @@ const Perms={
     ],`<p class="hint">Allow everything the app asks for so messages reach you the moment they arrive. If a permission is blocked, Android won’t ask again — open your phone’s Settings → Apps → Quantum Signal and turn it on there.</p>`+html);
   }
 };
+
+/* Setup banner: a persistent reminder on the chat list until notifications
+   and background activity are allowed. It reads a cached permission status
+   (PERM_ST) that is refreshed on unlock, when the app returns, and every
+   minute — so the user can never miss that setup is incomplete. */
+function setupBanner(){
+  if(!PERM_ST||!C().token)return"";
+  const p=[];
+  if(PERM_ST.notif==="denied"||PERM_ST.notif==="default")p.push("Notifications are off — you won’t be told about new messages.");
+  if(PERM_ST.batt==="on")p.push("Battery optimization is on — Android may pause the app in the background.");
+  if(!p.length)return"";
+  return`<div class="upc avail" style="margin:0 0 8px"><div><b>Finish setup</b><small>${p.join(" ")}</small></div><button data-a="perms">Fix</button></div>`;
+}
+let lastBanner="";
+async function refreshPerms(){
+  try{PERM_ST=await Perms.status()}catch(e){PERM_ST=null}
+  const b=setupBanner();
+  if(b!==lastBanner){lastBanner=b;if(!locked&&view==="list"&&tab==="chats")render()}
+}
 async function askPerms(){
-  if(C().permAsked||!C().token)return;
-  C().permAsked=true;save();
+  if(locked||!C().token||C().permOff)return;
   const st=await Perms.status();
   if(st.notif==="granted"&&st.batt==="off")return;
   sheet("Stay notified",[
-    ["Allow notifications",async()=>{await Perms.reqNotif();toast("You’re set — new messages will notify you right away")}],
-    ["Allow everything",async()=>{await Perms.reqNotif();await Perms.reqBatt();toast("All set — notifications and background activity allowed")}],
-    ["Not now",()=>{}]
+    ["Allow notifications",async()=>{await Perms.reqNotif();await refreshPerms();toast("You’re set — new messages will notify you right away")}],
+    ["Allow everything",async()=>{await Perms.reqNotif();await Perms.reqBatt();await refreshPerms();toast("All set — notifications and background activity allowed")}],
+    ["Not now",()=>{}],
+    ["Don’t ask again",()=>{C().permOff=true;save()}]
   ],`<p class="hint">Quantum Signal needs permission to notify you and to keep checking for messages in the background. Allow it now so you never miss a message.</p>`);
 }
 /* Push notifications (FCM/APNs): the plugin is in the app so the native
@@ -763,4 +784,5 @@ A.upd=s=>chkUp(!!s);
 const t0=A.tab;A.tab=v=>{t0(v);if(v==="set")chkUp()};
 load();applyTheme();render();if(Bio.native()&&C().bio&&C().pin&&!C().twofa)setTimeout(A.bio,400);setTimeout(()=>A.upd(1),400);
 setInterval(()=>chkUp(false),15*60*1000);
+setInterval(()=>refreshPerms(),60000);
 </script></body></html>
