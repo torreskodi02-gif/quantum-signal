@@ -126,11 +126,11 @@ const PK={autolock:{t:"Auto-lock",o:[[0,"Immediately"],[30,"After 30 seconds"],[
 const ACC=["#3a76f0","#6d4df2","#e0457b","#2fa36b","#e08a1e","#0e9fb5"];
 const fmt=t=>new Date(t).toLocaleTimeString([],{hour:"numeric",minute:"2-digit"});
 const fday=t=>new Date(t).toDateString()===new Date().toDateString()?fmt(t):new Date(t).toLocaleDateString([],{weekday:"short"});
-function seed(){return{mig:3,cfg:{server:CF,pin:null,bio:true,autolock:30,screenSec:true,receipts:true,notif:true,bg:true,incog:true,wipe10:false,theme:"system",acc:"#3a76f0",font:16,disap:0,cred:null,skin:"signal",bshape:"signal",bcol:"",inc:"plain",ts:"group"},chats:[{id:"Note to Self",name:"Note to Self",msgs:[],dis:0,ver:false,unread:0}]}}
+function seed(){return{mig:3,cfg:{server:CF,pin:null,bio:true,autolock:30,screenSec:true,receipts:true,notif:true,bg:true,permAsked:false,pushOn:false,incog:true,wipe10:false,theme:"system",acc:"#3a76f0",font:16,disap:0,cred:null,skin:"signal",bshape:"signal",bcol:"",inc:"plain",ts:"group"},chats:[{id:"Note to Self",name:"Note to Self",msgs:[],dis:0,ver:false,unread:0}]}}
 let S,view="list",tab="chats",cur=null,q="",reply=null,locked=true,pin="",stage=0,first="",tries=0,until=0,hid=0;
 const C=()=>S.cfg,chat=()=>S.chats.find(c=>c.id===cur),last=c=>c.msgs.length?c.msgs[c.msgs.length-1].ts:0;
 function save(){try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){}}
-function load(){try{S=JSON.parse(localStorage.getItem(KEY))}catch(e){S=null}if(!S||!S.cfg)S=seed();S.cfg=Object.assign({bshape:"signal",bcol:"",inc:"plain",ts:"group",skin:"signal",notif:true,bg:true,twofa:false,idle:0,keyAlert:true,hidePrev:false,clipClear:false,keep:0,servers:[],autoSwitch:true},S.cfg);if(!S.cfg.server)S.cfg.server=CF;if(S.mig!==3){S.chats=S.chats.filter(c=>c.pub||c.id==="Note to Self");const n=S.chats.find(c=>c.id==="Note to Self");if(n&&n.msgs.length===1&&n.msgs[0].t.startsWith("Ideas:"))n.msgs=[];S.mig=3;save()}}
+function load(){try{S=JSON.parse(localStorage.getItem(KEY))}catch(e){S=null}if(!S||!S.cfg)S=seed();S.cfg=Object.assign({bshape:"signal",bcol:"",inc:"plain",ts:"group",skin:"signal",notif:true,bg:true,permAsked:false,pushOn:false,twofa:false,idle:0,keyAlert:true,hidePrev:false,clipClear:false,keep:0,servers:[],autoSwitch:true},S.cfg);if(!S.cfg.server)S.cfg.server=CF;if(S.mig!==3){S.chats=S.chats.filter(c=>c.pub||c.id==="Note to Self");const n=S.chats.find(c=>c.id==="Note to Self");if(n&&n.msgs.length===1&&n.msgs[0].t.startsWith("Ideas:"))n.msgs=[];S.mig=3;save()}}
 function applyTheme(){const r=document.documentElement;r.dataset.theme=C().theme==="system"?"":C().theme;r.style.setProperty("--acc",C().acc);r.style.setProperty("--fs",C().font+"px");const k=SK[C().skin]||SK.signal;r.style.setProperty("--rad",k.rad+"px");r.style.setProperty("--wall",k.wall||"var(--bg)");k.wall==="#000"?r.style.setProperty("--bg","#000"):r.style.removeProperty("--bg");document.body.style.fontFamily=k.f||"";r.style.setProperty("--bo",C().bcol||"var(--acc)");r.style.setProperty("--rad",({signal:18,soft:24,sharp:6})[C().bshape||"signal"]+"px");r.dataset.inc=C().inc||"plain"}
 function toast(t){const d=document.createElement("div");d.className="toast";d.textContent=t;document.body.append(d);setTimeout(()=>d.remove(),2400)}
 function sheet(t,items,html=""){const d=document.createElement("div");d.className="sh";d.innerHTML=`<div class="bx"><h4>${t}</h4>${html}${items.map((x,i)=>`<button data-i="${i}">${x[0]}</button>`).join("")}</div>`;d.onclick=e=>{const b=e.target.closest("button");if(b){d.remove();items[b.dataset.i][1]()}else if(e.target===d)d.remove()};document.body.append(d)}
@@ -164,7 +164,7 @@ const tg=(k,t,d)=>`<div class="row" data-a="tg" data-v="${k}"><div><b>${t}</b><s
 const pk=(k,t)=>`<div class="row" data-a="pick" data-v="${k}"><div><b>${t}</b></div><small>${(PK[k].o.find(x=>x[0]==c[k])||[0,"Default"])[1]}</small></div>`;
 const act=(a,t,d,x="")=>`<div class="row ${x}" data-a="${a}"><div><b>${t}</b><small>${d}</small></div></div>`;
 return`<div class="pg">${upCard()}<div class="grp"><h3>Troubleshooting</h3>${act("debug","Check for errors","Scan the app, fix what it can, and show a report")}${act("seccheck","Security checkup","PIN, password, fingerprint, server and encryption at a glance")}</div><div class="prof">${av(c.user||"You",56)}<div><b style="font-size:18px">${c.user?"@"+E(c.user):"You"}</b><small>${c.token?"End-to-end encrypted":"Not connected to a server yet"}</small></div></div>
-<div class="grp"><h3>Privacy and security</h3>${tg("bio","Fingerprint unlock","Use your device’s fingerprint sensor to open the app")}${pk("autolock","Auto-lock")}${tg("screenSec","Screen security","Hide the app in recent apps and block previews")}${tg("incog","Incognito keyboard","Ask the keyboard not to learn what you type")}${tg("receipts","Read receipts","Let people see when you read their messages")}${tg("notif","Message notifications","Show a notification when a new message arrives")}${tg("bg","Keep running in background","Keep checking for messages when the app is in the background")}${tg("wipe10","Wipe after 10 wrong PINs","Erase all data on this device")}${pk("disap","Default disappearing timer")}</div>
+<div class="grp"><h3>Privacy and security</h3>${tg("bio","Fingerprint unlock","Use your device’s fingerprint sensor to open the app")}${pk("autolock","Auto-lock")}${tg("screenSec","Screen security","Hide the app in recent apps and block previews")}${tg("incog","Incognito keyboard","Ask the keyboard not to learn what you type")}${tg("receipts","Read receipts","Let people see when you read their messages")}${tg("notif","Message notifications","Show a notification when a new message arrives")}${tg("bg","Keep running in background","Keep checking for messages when the app is in the background")}${act("perms","Permissions","Notifications, camera, microphone and background activity")}${tg("wipe10","Wipe after 10 wrong PINs","Erase all data on this device")}${pk("disap","Default disappearing timer")}</div>
 <div class="grp"><h3>Appearance</h3><div class="row" data-a="skins"><div><b>Style</b></div><small>${(SK[c.skin]||SK.signal).n}</small></div>${pk("theme","Theme")}${pk("font","Message size")}<div class="sw2">${ACC.map(a=>`<i data-a="acc" data-v="${a}" class="${c.acc===a?"on":""}" style="background:${a}"></i>`).join("")}</div></div>
 <div class="grp"><h3>Advanced security</h3>${tg("twofa","Fingerprint + PIN","Require both to unlock")}${pk("idle","Lock when idle")}${tg("keyAlert","Contact key change alerts","Warn if someone’s encryption key changes")}${tg("hidePrev","Hide message previews","Don’t show message text in the chat list")}${tg("clipClear","Clear clipboard after copying","Wipes copied text after 30 seconds")}${pk("keep","Delete old messages")}</div>
 <div class="grp"><h3>Chat bubbles</h3>${pk("bshape","Bubble shape")}${pk("inc","Incoming bubbles")}${pk("ts","Timestamps")}<div class="row" style="cursor:default"><div><b>Sent bubble colour</b></div></div><div class="sw2">${BC.map(x=>`<i data-a="bcol" data-v="${x}" class="${(c.bcol||"")===x?"on":""}" style="background:${x||c.acc}"></i>`).join("")}</div></div>
@@ -224,7 +224,7 @@ document.addEventListener("input",e=>{if(e.target.id==="sq"){q=e.target.value;$(
 document.addEventListener("keydown",e=>{if(e.key==="Enter"&&e.target.id==="inp")send();if(e.key==="Enter"&&["au","ap","ap2"].includes(e.target.id))A.authgo()});
 document.addEventListener("visibilitychange",()=>{try{if(document.hidden){hid=Date.now();releaseWakeLock();dlog("vis","app hidden — starting background service");fgStart();if(C().screenSec)document.body.classList.add("priv")}else{document.body.classList.remove("priv");document.title="Quantum Signal";try{if("clearAppBadge" in navigator)navigator.clearAppBadge().catch(()=>{})}catch(e){}acquireWakeLock();fgStop();dlog("vis","app visible");if(!locked&&C().pin&&(Date.now()-hid)/1000>=C().autolock){locked=true;pin="";render()}else if(!locked){restartPoll();poll()}}}catch(e){logErr("visibility",e.message||e)}});
 setInterval(()=>{const n=Date.now();let ch=0;if(!locked&&C().pin&&C().idle&&n-lastAct>C().idle*6e4){locked=true;pin="";render()}S.chats.forEach(c=>{const k=c.msgs.length;c.msgs=c.msgs.filter(m=>(!m.exp||m.exp>n)&&(!C().keep||n-m.ts<C().keep*864e5));if(c.msgs.length!==k)ch=1});if(ch&&!locked){save();view==="chat"?renderMsgs():render()}},1000);
-const VER="0.8.4";
+const VER="0.8.5";
 const SK={signal:{n:"Signal",acc:"#3a76f0",rad:18,wall:"",f:""},ios:{n:"iOS",acc:"#0a84ff",rad:20,wall:"",f:"-apple-system,BlinkMacSystemFont,'SF Pro Text',system-ui,sans-serif"},midnight:{n:"Midnight (OLED)",acc:"#8b5cf6",rad:16,wall:"#000",f:"",dark:1},aurora:{n:"Aurora",acc:"#14b8a6",rad:22,wall:"linear-gradient(160deg,#0f2027,#203a43,#2c5364)",f:"",dark:1},sunset:{n:"Sunset",acc:"#f97316",rad:20,wall:"linear-gradient(160deg,#fff1e6,#ffe0f0)",f:"",light:1}};
 /* End-to-end encryption: ECDH P-256 key agreement + AES-GCM. Server only ever sees ciphertext. */
 const Net={
@@ -361,7 +361,7 @@ async authgo(){if(authBusy)return;const u=(($("#au")||{}).value||"").trim().toLo
 if(!/^[a-z0-9_]{3,20}$/.test(u))return err("Username: 3 to 20 letters, numbers or _");
 if(su){if(pw.length<12)return err("Password needs at least 12 characters");if(isCommonPw(pw))return err("That password is too common. Pick a stronger one");if(pw===u)return err("Password can’t be the same as your username");if(pw!==($("#ap2")||{}).value)return err("The two passwords don’t match")}else if(!pw)return err("Enter your password");
 authBusy=true;err("");const b=document.querySelector("[data-a=authgo]");if(b){b.disabled=true;b.textContent="Please wait…"}
-try{await(su?Net.signup(u,pw):Net.login(u,pw));authBusy=false;locked=!C().pin;view="list";tab="chats";render();toast(su?"Account created":"Welcome back, @"+u)}
+try{await(su?Net.signup(u,pw):Net.login(u,pw));authBusy=false;locked=!C().pin;view="list";tab="chats";render();toast(su?"Account created":"Welcome back, @"+u);setTimeout(()=>askPerms(),800)}
 catch(e){authBusy=false;logErr("auth",e);const m=authErr(e);render();const el=$("#aerr");if(el)el.textContent=m}},
 pw(){const has=!!C().hasPw;form(has?"Change password":"Add a password",has?["Current password","New password (8+ characters)","Confirm new password"]:["New password (8+ characters)","Confirm password"],async(...v)=>{const[old,n1,n2]=has?v:["",v[0],v[1]];
 if(n1.length<12)return toast("New password needs at least 12 characters");if(isCommonPw(n1))return toast("That password is too common. Pick a stronger one");if(n1!==n2)return toast("The new passwords don’t match");
@@ -371,6 +371,110 @@ logout(){if(!C().hasPw)return toast("Add a password first, or you won’t be abl
 sheet("Log out?",[["Log out and erase this phone’s chats",async()=>{try{await Net.j("/logout",{method:"POST",body:JSON.stringify({u:C().user})})}catch(e){}Object.assign(C(),{user:null,token:null,pub:null,priv:null,hasPw:false});S.chats=[noteChat()];S.ack=[];save();restartPoll();locked=false;view="list";tab="chats";authTab="login";render()}]],'<p class="hint">Messages already delivered to this phone are erased. Log in again with your password to get your account back here or on another phone. Past messages can’t be restored.</p>')},
 logoutall(){sheet("Log out of all other devices?",[["Log out everywhere else",async()=>{try{const d=await Net.j("/logout-all",{method:"POST",body:JSON.stringify({u:C().user})});toast("Logged out of "+(d.removed||0)+" other session"+(d.removed===1?"":"s"))}catch(e){toast(e.message==="not found"?"The server needs updating first. Run cloudflare.sh on your phone, then try again":"Couldn’t log out: "+Net.msg(e))}}]],'<p class="hint">This phone stays logged in. Every other phone or browser using this account is signed out.</p>')}
 });
+/* Permissions: one place to see and allow everything the app needs to
+   notify you instantly — notifications, camera, microphone, and the
+   battery-optimization exemption that lets Android keep the app alive
+   in the background. Statuses are checked live each time the screen opens. */
+const Perms={
+  plugin(n){return window.Capacitor&&Capacitor.Plugins&&Capacitor.Plugins[n]},
+  async notif(){
+    try{const L=this.plugin("LocalNotifications");
+      if(L){try{const r=await L.checkPermissions();if(r&&r.display)return r.display}catch(e){}}
+      if("Notification" in window)return Notification.permission||"default";
+    }catch(e){logErr("perm-notif",e.message||e)}
+    return "unknown";
+  },
+  async media(kind){
+    try{if(navigator.permissions&&navigator.permissions.query){const r=await navigator.permissions.query({name:kind==="video"?"camera":"microphone"});return r.state||"unknown"}}catch(e){}
+    return "unknown";
+  },
+  async batt(){
+    const B=this.plugin("BatteryOptimization");
+    if(!B)return "missing";
+    try{const r=await B.isBatteryOptimizationEnabled();return r.enabled?"on":"off"}catch(e){logErr("perm-batt",e.message||e);return "unknown"}
+  },
+  async status(){
+    return{
+      notif:await this.notif(),
+      cam:await this.media("video"),
+      mic:await this.media("audio"),
+      batt:await this.batt(),
+      fg:!!this.plugin("ForegroundService"),
+      fgOn:FG.on
+    };
+  },
+  async reqNotif(){
+    const ok=await reqNotifPerm();
+    dlog("perm","notifications -> "+(ok?"granted":"denied"));
+    if(!ok)toast("Notifications are blocked. Allow them in your phone’s Settings → Apps → Quantum Signal → Notifications.");
+    return ok;
+  },
+  async reqMedia(kind){
+    try{const st=await navigator.mediaDevices.getUserMedia(kind==="video"?{video:true}:{audio:true});
+      st.getTracks().forEach(t=>t.stop());
+      dlog("perm",kind+" -> granted");return true;
+    }catch(e){dlog("perm",kind+" -> denied ("+(e.name||e.message||e)+")");logErr("perm-"+kind,e.message||e);return false}
+  },
+  async reqBatt(){
+    const B=this.plugin("BatteryOptimization");
+    if(!B){toast("Battery plugin isn’t in this build yet — update to the newest APK");return false}
+    try{await B.requestIgnoreBatteryOptimization();dlog("perm","battery exemption requested");return true}
+    catch(e){dlog("perm","battery exemption failed: "+(e.message||e));logErr("perm-batt",e.message||e);
+      try{await B.openBatteryOptimizationSettings()}catch(_){}
+      toast("Pick Quantum Signal in the list and choose “Don’t optimize”");return false}
+  },
+  async sheet(){
+    toast("Checking permissions…");
+    const st=await this.status();
+    const row=(name,state,good,bad)=>`<div class="row" style="cursor:default"><div><b>${name}</b><small>${state}</small></div><span style="font-size:13px;color:${good?"#1f9d6b":"#e8590c"};font-weight:700">${good?"✓ Allowed":"✗ "+bad}</span></div>`;
+    const n=st.notif,ng=n==="granted";
+    const html=row("Notifications",ng?"Allowed — you’ll be told about new messages right away":n==="denied"?"Blocked — turn it on in your phone’s Settings → Apps → Quantum Signal → Notifications":"Not asked yet",ng,"Not allowed")
+      +row("Camera",st.cam==="granted"?"Allowed":st.cam==="denied"?"Blocked in the browser/app settings":"Not asked yet",st.cam==="granted","Not allowed")
+      +row("Microphone",st.mic==="granted"?"Allowed":st.mic==="denied"?"Blocked in the browser/app settings":"Not asked yet",st.mic==="granted","Not allowed")
+      +row("Battery optimization",st.batt==="off"?"Off — Android won’t stop the app in the background":st.batt==="on"?"On — Android may pause the app in the background, delaying messages":st.batt==="missing"?"Not in this build yet — update to the newest APK":"Couldn’t check",st.batt==="off","Still on")
+      +row("Background service",st.fg?(st.fgOn?"Running now":"Ready — starts when the app goes to the background"):"Not installed — update to the newest APK",!!st.fg,"Not installed");
+    sheet("Permissions",[
+      ["Allow notifications",async()=>{await this.reqNotif();this.sheet()}],
+      ["Allow camera",async()=>{await this.reqMedia("video");this.sheet()}],
+      ["Allow microphone",async()=>{await this.reqMedia("audio");this.sheet()}],
+      ["Allow background activity",async()=>{await this.reqBatt();this.sheet()}],
+      ["Allow everything",async()=>{await this.reqNotif();await this.reqBatt();this.sheet()}]
+    ],`<p class="hint">Allow everything the app asks for so messages reach you the moment they arrive. If a permission is blocked, Android won’t ask again — open your phone’s Settings → Apps → Quantum Signal and turn it on there.</p>`+html);
+  }
+};
+async function askPerms(){
+  if(C().permAsked||!C().token)return;
+  C().permAsked=true;save();
+  const st=await Perms.status();
+  if(st.notif==="granted"&&st.batt==="off")return;
+  sheet("Stay notified",[
+    ["Allow notifications",async()=>{await Perms.reqNotif();toast("You’re set — new messages will notify you right away")}],
+    ["Allow everything",async()=>{await Perms.reqNotif();await Perms.reqBatt();toast("All set — notifications and background activity allowed")}],
+    ["Not now",()=>{}]
+  ],`<p class="hint">Quantum Signal needs permission to notify you and to keep checking for messages in the background. Allow it now so you never miss a message.</p>`);
+}
+/* Push notifications (FCM/APNs): the plugin is in the app so the native
+   push service is registered, but registration stays OFF until a Firebase
+   project is connected (google-services.json + server push). When that
+   lands, set C().pushOn=true and the app registers its device token. */
+const Push={
+  plugin(){return window.Capacitor&&Capacitor.Plugins&&Capacitor.Plugins.PushNotifications},
+  async register(){
+    if(!C().pushOn)return;
+    const P=this.plugin();if(!P){dlog("push","plugin not available");return}
+    try{
+      const r=await P.requestPermissions();if(r.receive!=="granted"){dlog("push","permission denied");return}
+      await P.register();
+      P.addListener("registration",t=>{C().pushToken=t.value;save();dlog("push","registered, token saved")});
+      P.addListener("registrationError",e=>{dlog("push","registration error: "+(e.error||e));logErr("push",e.error||e)});
+      P.addListener("pushNotificationReceived",n=>{dlog("push","notification received");if(n&&n.title)notifyNew(n.title,n.body||"New message",null)});
+      P.addListener("pushNotificationActionPerformed",a=>{if(a&&a.notification&&a.notification.data&&a.notification.data.chat){cur=a.notification.data.chat;view="chat";render()}});
+    }catch(e){dlog("push","register failed: "+(e.message||e));logErr("push",e.message||e)}
+  }
+};
+Object.assign(A,{perms(){Perms.sheet()}});
+setTimeout(()=>{try{if(C().token)askPerms()}catch(e){}},2000);
+setTimeout(()=>{try{Push.register()}catch(e){}},3000);
 /* Persistent debug log: every important event (polls, visibility, network,
    notifications, background service, errors) is written to a ring buffer in
    localStorage, so it survives app restarts. Send it to Merlin from the
@@ -520,6 +624,9 @@ if(!cfg.notif)add("warn","Message notifications are off","Turn them on in Settin
 else if(!LN&&!("Notification" in window))add("bad","No notification channel available","Notifications can’t be shown on this device.");
 else add("ok","Notifications ready",LN?"Local notifications available":"Web notifications");
 if(cfg.bg){if(!FGp)add("warn","Background service not installed","This build doesn’t include it. Update to the newest APK.");else if(FG.on)add("ok","Background service running","The app keeps checking for messages while in the background.");else add("ok","Background service ready","It starts when the app goes to the background.");}else add("warn","Keep running in background is off","Turn it on in Settings → Privacy and security.");
+const BO=window.Capacitor&&Capacitor.Plugins&&Capacitor.Plugins.BatteryOptimization;
+if(BO){try{const r=await BO.isBatteryOptimizationEnabled();r.enabled?add("warn","Battery optimization is on","Android may pause the app in the background. Settings → Permissions → Allow background activity."):add("ok","Battery optimization off","Android won’t stop the app in the background.")}catch(e){add("warn","Couldn’t check battery optimization",Net.msg(e))}}
+else add("warn","Battery plugin not installed","Update to the newest APK.");
 if(DBG.length)add("ok","Debug log: "+DBG.length+" entries","Copy it below and send it to Merlin if messages still don’t arrive.");
 save();if(!locked)render();if(cfg.token)poll();
 const nb=L.filter(x=>x.k==="bad").length,nw=L.filter(x=>x.k==="warn").length;
