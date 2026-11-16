@@ -1,1 +1,8 @@
-{"notes":"V0.9.0: FCM push — the reliable fix for closed-app notifications. Client: Push.register() no longer gated on pushOn (it now attempts registration whenever the plugin is present and only succeeds once Firebase is connected), creates a Messages notification channel, and POSTs the device token to the server (/push-token). Server (worker-v090.js): new push_tokens table, POST/DELETE /push-token, and on every /send it sends a high-priority FCM notification (sender name only, never message content) via the FCM HTTP v1 API using the FCM_KEY service-account secret; stale tokens are pruned. Also: notifyNew() now uses isExactNotification:false + allowWhileIdle:true (no exact-alarm hang, fires in Doze), and the plugin manifest adds SCHEDULE_EXACT_ALARM. FCM is inert until Kodi provides google-services.json (app) + the FCM_KEY service-account secret and runs cloudflare.sh (server).","server":"https://quantum-signal.qs-066647a2.workers.dev","servers":["https://quantum-signal.qs-066647a2.workers.dev"],"version":"0.9.0"}
+{
+  "notes": "V0.9.1 hotfix: fixes the v0.9.0 crash on open. Push.register() no longer runs automatically \u2014 it is gated behind a pushReady flag (default false) because the Capacitor PushNotifications plugin's register() calls FirebaseMessaging.getInstance(), which throws a native IllegalStateException that can crash the app when Firebase is not configured (no google-services.json yet). Registration only runs once Firebase is actually in the build. Also removes the createChannel() call. Everything else from v0.9.0 is kept (server /push-token, notifyNew exact-alarm/Doze fix, diagnostics).",
+  "server": "https://quantum-signal.qs-066647a2.workers.dev",
+  "servers": [
+    "https://quantum-signal.qs-066647a2.workers.dev"
+  ],
+  "version": "0.9.1"
+}

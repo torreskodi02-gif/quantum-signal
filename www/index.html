@@ -126,7 +126,7 @@ const PK={autolock:{t:"Auto-lock",o:[[0,"Immediately"],[30,"After 30 seconds"],[
 const ACC=["#3a76f0","#6d4df2","#e0457b","#2fa36b","#e08a1e","#0e9fb5"];
 const fmt=t=>new Date(t).toLocaleTimeString([],{hour:"numeric",minute:"2-digit"});
 const fday=t=>new Date(t).toDateString()===new Date().toDateString()?fmt(t):new Date(t).toLocaleDateString([],{weekday:"short"});
-function seed(){return{mig:3,cfg:{server:CF,pin:null,bio:true,autolock:30,screenSec:true,receipts:true,notif:true,bg:true,permAsked:false,pushOn:false,backup:true,permOff:false,incog:true,wipe10:false,theme:"system",acc:"#3a76f0",font:16,disap:0,cred:null,skin:"signal",bshape:"signal",bcol:"",inc:"plain",ts:"group"},chats:[{id:"Note to Self",name:"Note to Self",msgs:[],dis:0,ver:false,unread:0}]}}
+function seed(){return{mig:3,cfg:{server:CF,pin:null,bio:true,autolock:30,screenSec:true,receipts:true,notif:true,bg:true,permAsked:false,pushOn:false,pushReady:false,backup:true,permOff:false,incog:true,wipe10:false,theme:"system",acc:"#3a76f0",font:16,disap:0,cred:null,skin:"signal",bshape:"signal",bcol:"",inc:"plain",ts:"group"},chats:[{id:"Note to Self",name:"Note to Self",msgs:[],dis:0,ver:false,unread:0}]}}
 let S,view="list",tab="chats",cur=null,q="",reply=null,locked=true,pin="",stage=0,first="",tries=0,until=0,hid=0;
 let PERM_ST=null;
 const C=()=>S.cfg,chat=()=>S.chats.find(c=>c.id===cur),last=c=>c.msgs.length?c.msgs[c.msgs.length-1].ts:0;
@@ -208,7 +208,7 @@ const Backup={
   }
 };
 
-function load(){try{S=JSON.parse(localStorage.getItem(KEY))}catch(e){S=null}if(!S||!S.cfg)S=seed();S.cfg=Object.assign({bshape:"signal",bcol:"",inc:"plain",ts:"group",skin:"signal",notif:true,bg:true,permAsked:false,pushOn:false,backup:true,permOff:false,twofa:false,idle:0,keyAlert:true,hidePrev:false,clipClear:false,keep:0,servers:[],autoSwitch:true},S.cfg);if(!S.cfg.server)S.cfg.server=CF;if(S.mig!==3){S.chats=S.chats.filter(c=>c.pub||c.id==="Note to Self");const n=S.chats.find(c=>c.id==="Note to Self");if(n&&n.msgs.length===1&&n.msgs[0].t.startsWith("Ideas:"))n.msgs=[];S.mig=3;save()}}
+function load(){try{S=JSON.parse(localStorage.getItem(KEY))}catch(e){S=null}if(!S||!S.cfg)S=seed();S.cfg=Object.assign({bshape:"signal",bcol:"",inc:"plain",ts:"group",skin:"signal",notif:true,bg:true,permAsked:false,pushOn:false,pushReady:false,backup:true,permOff:false,twofa:false,idle:0,keyAlert:true,hidePrev:false,clipClear:false,keep:0,servers:[],autoSwitch:true},S.cfg);if(!S.cfg.server)S.cfg.server=CF;if(S.mig!==3){S.chats=S.chats.filter(c=>c.pub||c.id==="Note to Self");const n=S.chats.find(c=>c.id==="Note to Self");if(n&&n.msgs.length===1&&n.msgs[0].t.startsWith("Ideas:"))n.msgs=[];S.mig=3;save()}}
 function applyTheme(){const r=document.documentElement;r.dataset.theme=C().theme==="system"?"":C().theme;r.style.setProperty("--acc",C().acc);r.style.setProperty("--fs",C().font+"px");const k=SK[C().skin]||SK.signal;r.style.setProperty("--rad",k.rad+"px");r.style.setProperty("--wall",k.wall||"var(--bg)");k.wall==="#000"?r.style.setProperty("--bg","#000"):r.style.removeProperty("--bg");document.body.style.fontFamily=k.f||"";r.style.setProperty("--bo",C().bcol||"var(--acc)");r.style.setProperty("--rad",({signal:18,soft:24,sharp:6})[C().bshape||"signal"]+"px");r.dataset.inc=C().inc||"plain"}
 function toast(t){const d=document.createElement("div");d.className="toast";d.textContent=t;document.body.append(d);setTimeout(()=>d.remove(),2400)}
 function sheet(t,items,html=""){const d=document.createElement("div");d.className="sh";d.innerHTML=`<div class="bx"><h4>${t}</h4>${html}${items.map((x,i)=>`<button data-i="${i}">${x[0]}</button>`).join("")}</div>`;d.onclick=e=>{const b=e.target.closest("button");if(b){d.remove();items[b.dataset.i][1]()}else if(e.target===d)d.remove()};document.body.append(d)}
@@ -302,7 +302,7 @@ document.addEventListener("input",e=>{if(e.target.id==="sq"){q=e.target.value;$(
 document.addEventListener("keydown",e=>{if(e.key==="Enter"&&e.target.id==="inp")send();if(e.key==="Enter"&&["au","ap","ap2"].includes(e.target.id))A.authgo()});
 document.addEventListener("visibilitychange",()=>{try{if(document.hidden){hid=Date.now();releaseWakeLock();dlog("vis","app hidden — starting background service");fgStart();if(Backup.dirty)Backup.upload(true);if(C().screenSec)document.body.classList.add("priv")}else{document.body.classList.remove("priv");document.title="Quantum Signal";try{if("clearAppBadge" in navigator)navigator.clearAppBadge().catch(()=>{})}catch(e){}acquireWakeLock();fgStop();dlog("vis","app visible");chkUp();refreshPerms();if(!locked&&C().pin&&(Date.now()-hid)/1000>=C().autolock){locked=true;pin="";render()}else if(!locked){restartPoll();poll()}}}catch(e){logErr("visibility",e.message||e)}});
 setInterval(()=>{const n=Date.now();let ch=0;if(!locked&&C().pin&&C().idle&&n-lastAct>C().idle*6e4){locked=true;pin="";render()}S.chats.forEach(c=>{const k=c.msgs.length;c.msgs=c.msgs.filter(m=>(!m.exp||m.exp>n)&&(!C().keep||n-m.ts<C().keep*864e5));if(c.msgs.length!==k)ch=1});if(ch&&!locked){save();view==="chat"?renderMsgs():render()}},1000);
-const VER="0.9.0";
+const VER="0.9.1";
 const APK_URL="https://github.com/torreskodi02-gif/quantum-signal/releases/download/latest/quantum-signal.apk";
 const SK={signal:{n:"Signal",acc:"#3a76f0",rad:18,wall:"",f:""},ios:{n:"iOS",acc:"#0a84ff",rad:20,wall:"",f:"-apple-system,BlinkMacSystemFont,'SF Pro Text',system-ui,sans-serif"},midnight:{n:"Midnight (OLED)",acc:"#8b5cf6",rad:16,wall:"#000",f:"",dark:1},aurora:{n:"Aurora",acc:"#14b8a6",rad:22,wall:"linear-gradient(160deg,#0f2027,#203a43,#2c5364)",f:"",dark:1},sunset:{n:"Sunset",acc:"#f97316",rad:20,wall:"linear-gradient(160deg,#fff1e6,#ffe0f0)",f:"",light:1}};
 /* End-to-end encryption: ECDH P-256 key agreement + AES-GCM. Server only ever sees ciphertext. */
@@ -569,11 +569,15 @@ const Push={
     try{await Net.j("/push-token",{method:"POST",body:JSON.stringify({u:C().user,token:tok})});dlog("push","token sent to server")}catch(e){dlog("push","token send failed: "+(e.message||e))}
   },
   async register(){
+    // NEVER attempt registration unless Firebase is actually configured
+    // in this build (pushReady). Calling the plugin's register() without
+    // google-services.json throws a native IllegalStateException that can
+    // crash the app on open — that is the v0.9.0 crash.
+    if(!C().pushReady){dlog("push","not configured (pushReady off)");return}
     if(this._done)return;
     const P=this.plugin();if(!P){dlog("push","plugin not available");return}
     this._done=true;
     try{
-      try{await P.createChannel({id:"messages",name:"Messages",importance:4,visibility:1})}catch(e){}
       const r=await P.requestPermissions();if(r.receive!=="granted"){dlog("push","permission denied");return}
       await P.register();
       P.addListener("registration",t=>{C().pushToken=t.value;C().pushOn=true;save();dlog("push","registered, token saved");this.sendToken()});
@@ -739,7 +743,7 @@ const LN=window.Capacitor&&Capacitor.Plugins&&Capacitor.Plugins.LocalNotificatio
 if(!cfg.notif)add("warn","Message notifications are off","Turn them on in Settings → Privacy and security.");
 else if(!LN&&!("Notification" in window))add("bad","No notification channel available","Notifications can’t be shown on this device.");
 else add("ok","Notifications ready",LN?"Local notifications available":"Web notifications");
-if(cfg.bg){if(!FGp)add("warn","Background service not installed","This build doesn’t include it. Update to the newest APK.");else if(FG.on)add("ok","Background service running","The app keeps checking for messages while in the background.");else add(fgLast&&fgLast.indexOf("FAILED")===0?"warn":"ok","Background service not running",fgLast?("Last start: "+fgLast+". It retries when the app goes to the background."):"It starts when the app goes to the background.");add(lastBgPoll?"ok":"warn","Last background poll",lastBgPoll?Math.round((Date.now()-lastBgPoll)/1000)+"s ago":"Never — no poll has finished while the app was hidden.");add(C().pushToken?"ok":"warn","Push notifications (FCM)",C().pushToken?"Registered — the server can notify this phone even when the app is closed.":"Not registered — needs a Firebase project (google-services.json) in the app. Until then, messages only arrive while the app is running.");}else add("warn","Keep running in background is off","Turn it on in Settings → Privacy and security.");
+if(cfg.bg){if(!FGp)add("warn","Background service not installed","This build doesn’t include it. Update to the newest APK.");else if(FG.on)add("ok","Background service running","The app keeps checking for messages while in the background.");else add(fgLast&&fgLast.indexOf("FAILED")===0?"warn":"ok","Background service not running",fgLast?("Last start: "+fgLast+". It retries when the app goes to the background."):"It starts when the app goes to the background.");add(lastBgPoll?"ok":"warn","Last background poll",lastBgPoll?Math.round((Date.now()-lastBgPoll)/1000)+"s ago":"Never — no poll has finished while the app was hidden.");add(C().pushToken?"ok":"warn","Push notifications (FCM)",C().pushToken?"Registered — the server can notify this phone even when the app is closed.":(!C().pushReady?"Off — Firebase is not connected in this build, so push registration is disabled (this is what stopped the v0.9.0 crash).":"Not registered — needs a Firebase project (google-services.json) in the app. Until then, messages only arrive while the app is running."));}else add("warn","Keep running in background is off","Turn it on in Settings → Privacy and security.");
 const BO=window.Capacitor&&Capacitor.Plugins&&Capacitor.Plugins.BatteryOptimization;
 if(BO){try{const r=await BO.isBatteryOptimizationEnabled();r.enabled?add("warn","Battery optimization is on","Android may pause the app in the background. Settings → Permissions → Allow background activity."):add("ok","Battery optimization off","Android won’t stop the app in the background.")}catch(e){add("warn","Couldn’t check battery optimization",Net.msg(e))}}
 else add("warn","Battery plugin not installed","Update to the newest APK.");
