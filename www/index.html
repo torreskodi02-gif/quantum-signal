@@ -242,7 +242,7 @@ const tg=(k,t,d)=>`<div class="row" data-a="tg" data-v="${k}"><div><b>${t}</b><s
 const pk=(k,t)=>`<div class="row" data-a="pick" data-v="${k}"><div><b>${t}</b></div><small>${(PK[k].o.find(x=>x[0]==c[k])||[0,"Default"])[1]}</small></div>`;
 const act=(a,t,d,x="")=>`<div class="row ${x}" data-a="${a}"><div><b>${t}</b><small>${d}</small></div></div>`;
 return`<div class="pg">${upCard()}<div class="grp"><h3>Troubleshooting</h3>${act("debug","Check for errors","Scan the app, fix what it can, and show a report")}${act("seccheck","Security checkup","PIN, password, fingerprint, server and encryption at a glance")}</div><div class="prof">${av(c.user||"You",56)}<div><b style="font-size:18px">${c.user?"@"+E(c.user):"You"}</b><small>${c.token?"End-to-end encrypted":"Not connected to a server yet"}</small></div></div>
-<div class="grp"><h3>Privacy and security</h3>${tg("bio","Fingerprint unlock","Use your device’s fingerprint sensor to open the app")}${pk("autolock","Auto-lock")}${tg("screenSec","Screen security","Hide the app in recent apps and block previews")}${tg("incog","Incognito keyboard","Ask the keyboard not to learn what you type")}${tg("receipts","Read receipts","Let people see when you read their messages")}${tg("notif","Message notifications","Show a notification when a new message arrives")}${tg("bg","Keep running in background","Keep checking for messages when the app is in the background")}${act("perms","Permissions","Notifications, camera, microphone and background activity")}${tg("wipe10","Wipe after 10 wrong PINs","Erase all data on this device")}${pk("disap","Default disappearing timer")}</div>
+<div class="grp"><h3>Privacy and security</h3>${tg("bio","Fingerprint unlock","Use your device’s fingerprint sensor to open the app")}${pk("autolock","Auto-lock")}${tg("screenSec","Screen security","Hide the app in recent apps and block previews")}${tg("incog","Incognito keyboard","Ask the keyboard not to learn what you type")}${tg("receipts","Read receipts","Let people see when you read their messages")}${tg("notif","Message notifications","Show a notification when a new message arrives")}${tg("bg","Keep running in background","Keep checking for messages when the app is in the background")}${act("perms","Permissions","Notifications, camera, microphone and background activity")}${act("secq","Security questions","Set up questions to recover your password if you forget it")}${tg("wipe10","Wipe after 10 wrong PINs","Erase all data on this device")}${pk("disap","Default disappearing timer")}</div>
 <div class="grp"><h3>Appearance</h3><div class="row" data-a="skins"><div><b>Style</b></div><small>${(SK[c.skin]||SK.signal).n}</small></div>${pk("theme","Theme")}${pk("font","Message size")}<div class="sw2">${ACC.map(a=>`<i data-a="acc" data-v="${a}" class="${c.acc===a?"on":""}" style="background:${a}"></i>`).join("")}</div></div>
 <div class="grp"><h3>Advanced security</h3>${tg("twofa","Fingerprint + PIN","Require both to unlock")}${pk("idle","Lock when idle")}${tg("keyAlert","Contact key change alerts","Warn if someone’s encryption key changes")}${tg("hidePrev","Hide message previews","Don’t show message text in the chat list")}${tg("clipClear","Clear clipboard after copying","Wipes copied text after 30 seconds")}${pk("keep","Delete old messages")}</div>
 <div class="grp"><h3>Chat bubbles</h3>${pk("bshape","Bubble shape")}${pk("inc","Incoming bubbles")}${pk("ts","Timestamps")}<div class="row" style="cursor:default"><div><b>Sent bubble colour</b></div></div><div class="sw2">${BC.map(x=>`<i data-a="bcol" data-v="${x}" class="${(c.bcol||"")===x?"on":""}" style="background:${x||c.acc}"></i>`).join("")}</div></div>
@@ -294,7 +294,7 @@ acc(v){C().acc=v;save();applyTheme();render()},
 async fp(){toast(await Bio.auth()?"Fingerprint verified ✓":(Bio.err||"Fingerprint check failed"))},
 pin(){ask("Current PIN","Current PIN",v=>{if(v!==C().pin)return toast("Wrong PIN");C().pin=null;save();locked=true;pin="";stage=0;render()})},
 debug(){diag()},
-seccheck(){secCheck()},
+seccheck(){secCheck()}, forgot(){forgotFlow()}, secq(){secqSetup()},
 resetnet(){sheet("Reset server account?",[["Reset account",()=>{Object.assign(C(),{user:null,token:null,pub:null,priv:null});BK=null;save();restartPoll();authWarned=false;render();toast("Account reset. Choose a username again.")}]],'<p class="hint">Removes your username and keys from this phone. Chats with other people stop working until you register again.</p>')},
 panic(){sheet("Wipe all data?",[["Yes, wipe everything now",wipe]],'<p class="hint">Deletes every chat, setting and your PIN from this device.</p>')}};
 document.addEventListener("click",e=>{const el=e.target.closest("[data-a]");if(el&&A[el.dataset.a])A[el.dataset.a](el.dataset.v)});
@@ -302,7 +302,7 @@ document.addEventListener("input",e=>{if(e.target.id==="sq"){q=e.target.value;$(
 document.addEventListener("keydown",e=>{if(e.key==="Enter"&&e.target.id==="inp")send();if(e.key==="Enter"&&["au","ap","ap2"].includes(e.target.id))A.authgo()});
 document.addEventListener("visibilitychange",()=>{try{if(document.hidden){hid=Date.now();releaseWakeLock();dlog("vis","app hidden — starting background service");fgStart();if(Backup.dirty)Backup.upload(true);if(C().screenSec)document.body.classList.add("priv")}else{document.body.classList.remove("priv");document.title="Quantum Signal";try{if("clearAppBadge" in navigator)navigator.clearAppBadge().catch(()=>{})}catch(e){}acquireWakeLock();fgStop();dlog("vis","app visible");chkUp();refreshPerms();if(!locked&&C().pin&&(Date.now()-hid)/1000>=C().autolock){locked=true;pin="";render()}else if(!locked){restartPoll();poll()}}}catch(e){logErr("visibility",e.message||e)}});
 setInterval(()=>{const n=Date.now();let ch=0;if(!locked&&C().pin&&C().idle&&n-lastAct>C().idle*6e4){locked=true;pin="";render()}S.chats.forEach(c=>{const k=c.msgs.length;c.msgs=c.msgs.filter(m=>(!m.exp||m.exp>n)&&(!C().keep||n-m.ts<C().keep*864e5));if(c.msgs.length!==k)ch=1});if(ch&&!locked){save();view==="chat"?renderMsgs():render()}},1000);
-const VER="0.9.1";
+const VER="0.9.2";
 const APK_URL="https://github.com/torreskodi02-gif/quantum-signal/releases/download/latest/quantum-signal.apk";
 const SK={signal:{n:"Signal",acc:"#3a76f0",rad:18,wall:"",f:""},ios:{n:"iOS",acc:"#0a84ff",rad:20,wall:"",f:"-apple-system,BlinkMacSystemFont,'SF Pro Text',system-ui,sans-serif"},midnight:{n:"Midnight (OLED)",acc:"#8b5cf6",rad:16,wall:"#000",f:"",dark:1},aurora:{n:"Aurora",acc:"#14b8a6",rad:22,wall:"linear-gradient(160deg,#0f2027,#203a43,#2c5364)",f:"",dark:1},sunset:{n:"Sunset",acc:"#f97316",rad:20,wall:"linear-gradient(160deg,#fff1e6,#ffe0f0)",f:"",light:1}};
 /* End-to-end encryption: ECDH P-256 key agreement + AES-GCM. Server only ever sees ciphertext. */
@@ -414,6 +414,84 @@ restartPoll();save();render();probe()};
 /* ---- account: username + password login. The password never leaves the phone: it only unlocks your encryption key. ---- */
 const enc=s=>new TextEncoder().encode(s),hx=b=>[...new Uint8Array(b)].map(x=>x.toString(16).padStart(2,"0")).join("");
 async function kdf(u,pw){const k=await crypto.subtle.importKey("raw",enc(pw.normalize("NFKC")),"PBKDF2",false,["deriveBits"]),bits=await crypto.subtle.deriveBits({name:"PBKDF2",hash:"SHA-256",salt:enc("qs-v1:"+u),iterations:6e5},k,512);return{auth:hx(bits.slice(0,32)),key:await crypto.subtle.importKey("raw",bits.slice(32),"AES-GCM",false,["encrypt","decrypt"])}}
+/* Forgot password with security questions.
+   The recovery key is derived from the two answers (PBKDF2, salt
+   "qs-recovery:"+username). The private key is encrypted with it and
+   stored on the server as the recovery blob. The server only ever sees
+   the question texts, the SHA-256 hashes of the normalized answers, and
+   the blob — never the answers or the private key. Answering correctly
+   lets you set a new password and keep your identity and old messages. */
+const SECQ=["What was the name of your first pet?","What city were you born in?","What is your mother's maiden name?","What was the name of your first school?","What is your favourite food?","What was your first car?","What is the name of your best friend from childhood?","What street did you grow up on?"];
+function normAns(a){return String(a||"").normalize("NFKC").toLowerCase().trim().replace(/\s+/g," ")}
+async function sha256hex(s){return hx(await crypto.subtle.digest("SHA-256",enc(s)))}
+async function rkdf(u,a1,a2){
+  const k=await crypto.subtle.importKey("raw",enc(normAns(a1)+"\n"+normAns(a2)),"PBKDF2",false,["deriveBits"]);
+  const bits=await crypto.subtle.deriveBits({name:"PBKDF2",hash:"SHA-256",salt:enc("qs-recovery:"+u),iterations:6e5},k,512);
+  return await crypto.subtle.importKey("raw",bits.slice(32),"AES-GCM",false,["encrypt","decrypt"]);
+}
+async function forgotFlow(){
+  const uv=await new Promise(res=>ask("Forgot password","username",v=>res(v)));
+  const u=String(uv||"").trim().toLowerCase();
+  if(!u)return;
+  let qs;
+  try{qs=await Net.j("/security-questions?u="+encodeURIComponent(u))}catch(e){toast(e.message==="not found"?"No security questions set up for that account.":Net.msg(e));return}
+  const ans=await new Promise(res=>{
+    window._fa1="";window._fa2="";
+    sheet("Answer your security questions",[["Continue",()=>res([window._fa1,window._fa2])],["Cancel",()=>res(null)]],
+      `<div style="padding:4px 16px"><p style="margin:4px 0"><b>1.</b> ${E(qs.q1)}</p><input class="srch" style="margin:0;width:100%;box-sizing:border-box" placeholder="Answer 1" autocomplete="off" oninput="window._fa1=this.value"><p style="margin:12px 0 4px"><b>2.</b> ${E(qs.q2)}</p><input class="srch" style="margin:0;width:100%;box-sizing:border-box" placeholder="Answer 2" autocomplete="off" oninput="window._fa2=this.value"></div>`);
+  });
+  if(!ans)return;
+  const a1=ans[0],a2=ans[1];
+  if(!a1.trim()||!a2.trim()){toast("Answer both questions.");return}
+  let r;
+  try{
+    r=await Net.j("/forgot-password",{method:"POST",body:JSON.stringify({u,a1:await sha256hex(normAns(a1)),a2:await sha256hex(normAns(a2))})});
+  }catch(e){toast(e.message==="wrong answers"?"Those answers don’t match. Try again.":e.message==="too many attempts"?"Too many attempts. Wait 15 minutes and try again.":Net.msg(e));return}
+  let priv;
+  try{
+    const key=await rkdf(u,a1,a2);
+    const pt=await crypto.subtle.decrypt({name:"AES-GCM",iv:b64d(r.rec_iv)},key,b64d(r.rec_ct));
+    priv=JSON.parse(new TextDecoder().decode(pt));
+  }catch(e){toast("Couldn’t unlock the recovery data.");return}
+  const pw=await new Promise(res=>{
+    window._fp1="";window._fp2="";
+    sheet("Choose a new password",[["Reset password",()=>res([window._fp1,window._fp2])],["Cancel",()=>res(null)]],
+      `<div style="padding:4px 16px"><input class="srch" style="margin:0;width:100%;box-sizing:border-box" type="password" placeholder="New password (at least 12 characters)" autocomplete="new-password" oninput="window._fp1=this.value"><input class="srch" style="margin:8px 0 0;width:100%;box-sizing:border-box" type="password" placeholder="Confirm new password" autocomplete="new-password" oninput="window._fp2=this.value"></div>`);
+  });
+  if(!pw)return;
+  const np=pw[0],np2=pw[1];
+  if(np.length<12){toast("Password needs at least 12 characters.");return}
+  if(isCommonPw(np)){toast("That password is too common. Pick a stronger one.");return}
+  if(np!==np2){toast("The two passwords don’t match.");return}
+  try{
+    const k=await kdf(u,np);
+    const iv=crypto.getRandomValues(new Uint8Array(12));
+    const ct=await crypto.subtle.encrypt({name:"AES-GCM",iv},k.key,enc(JSON.stringify(priv)));
+    const d=await Net.j("/reset-password",{method:"POST",body:JSON.stringify({u,reset_token:r.reset_token,auth:k.auth,vault:{iv:b64e(iv),ct:b64e(ct)}})});
+    Object.assign(C(),{user:u,token:d.token,pub:d.pub,priv});save();locked=!C().pin;view="list";tab="chats";render();
+    toast("Password reset. Welcome back, @"+u);
+  }catch(e){toast(Net.msg(e));return}
+}
+async function secqSetup(){
+  if(!C().token||!C().priv){toast("Log in first.");return}
+  const q=await new Promise(res=>{
+    window._sq1=SECQ[0];window._sq2=SECQ[1];window._sa1="";window._sa2="";
+    const opts=SECQ.map(x=>`<option>${E(x)}</option>`).join("");
+    sheet("Security questions",[["Save",()=>res([window._sq1,window._sq2,window._sa1,window._sa2])],["Cancel",()=>res(null)]],
+      `<div style="padding:4px 16px"><p style="margin:4px 0">Pick two questions. If you forget your password, answering them lets you set a new one without losing your messages.</p><select class="srch" style="margin:0;width:100%;box-sizing:border-box" onchange="window._sq1=this.value">${opts}</select><input class="srch" style="margin:8px 0 0;width:100%;box-sizing:border-box" placeholder="Answer 1" autocomplete="off" oninput="window._sa1=this.value"><select class="srch" style="margin:12px 0 0;width:100%;box-sizing:border-box" onchange="window._sq2=this.value">${opts}</select><input class="srch" style="margin:8px 0 0;width:100%;box-sizing:border-box" placeholder="Answer 2" autocomplete="off" oninput="window._sa2=this.value"></div>`);
+  });
+  if(!q)return;
+  const q1=q[0],q2=q[1],a1=q[2],a2=q[3];
+  if(q1===q2){toast("Pick two different questions.");return}
+  if(!a1.trim()||!a2.trim()){toast("Answer both questions.");return}
+  try{
+    const key=await rkdf(C().user,a1,a2);
+    const iv=crypto.getRandomValues(new Uint8Array(12));
+    const ct=await crypto.subtle.encrypt({name:"AES-GCM",iv},key,enc(JSON.stringify(C().priv)));
+    await Net.j("/security-questions",{method:"POST",body:JSON.stringify({u:C().user,q1,q2,a1:await sha256hex(normAns(a1)),a2:await sha256hex(normAns(a2)),rec_iv:b64e(iv),rec_ct:b64e(ct)})});
+    toast("Security questions saved.");
+  }catch(e){toast(Net.msg(e))}
+}
 const COMMON_PW=new Set("password password1 12345678 123456789 1234567890 1234567 123123 qwertyuiop qwerty123 1q2w3e4r qazwsx letmein welcome welcome1 admin admin123 monkey dragon football sunshine master shadow superman michael jennifer 11111111 00000000 abcdefgh iloveyou trustno1 starwars whatever freedom hello123 charlie thomas jordan michelle secret passw0rd password123 login pass1234".split(" "));
 function pwStr(v){const e=document.getElementById("pwstr");if(!e)return;if(!v){e.textContent="";return}if(v.length<12)e.textContent="Too short — at least 12 characters";else if(isCommonPw(v))e.textContent="Too common — pick a stronger one";else{const m=(/[a-z]/.test(v)?1:0)+(/[A-Z]/.test(v)?1:0)+(/\d/.test(v)?1:0)+(/[^A-Za-z0-9]/.test(v)?1:0);e.textContent=v.length>=16&&m>=3?"Strong password":m>=3?"Good password":"Okay — add capitals, numbers or symbols to make it stronger"}}
 const isCommonPw=p=>{const v=p.toLowerCase();if(COMMON_PW.has(v))return true;const b=v.replace(/[\d\W]+$/,"");return b.length>=6&&COMMON_PW.has(b)};
@@ -431,7 +509,7 @@ function authHTML(){const su=authTab==="signup";return`<div class="auth"><div cl
 <input id="ap" class="fi" type="password" placeholder="Password" autocomplete="${su?"new-password":"current-password"}" oninput="pwStr(this.value)">
 ${su?'<input id="ap2" class="fi" type="password" placeholder="Confirm password" autocomplete="new-password"><small>At least 12 characters, and not a common password. Your password never leaves this phone. It only unlocks your encryption key.</small><small id="pwstr"></small>':""}
 <p id="aerr" class="err" role="alert"></p>
-<button class="rbtn wide" data-a="authgo" ${authBusy?"disabled":""}>${authBusy?"Please wait…":su?"Create account":"Log in"}</button>
+<button class="rbtn wide" data-a="authgo" ${authBusy?"disabled":""}>${authBusy?"Please wait…":su?"Create account":"Log in"}</button> ${su?"":`<div style="text-align:center;margin-top:10px"><a data-a="forgot" style="color:var(--ac);cursor:pointer">Forgot password?</a></div>`}
 <small class="sv">Server: ${E(host(C().server||"none"))} <a data-a="srvset">Change</a></small></div>`}
 const authErr=e=>e.message==="taken"?"That username is taken":e.message==="login"?"Wrong username or password":e.message==="too many attempts"?"Too many attempts. Wait 15 minutes and try again":e.message==="too many sign-ups"?"Too many sign-ups from this network. Try later":e.name==="AbortError"||e instanceof TypeError||/no server/.test(e.message)?"Can’t reach the server. Check your connection":Net.msg(e);
 function form(title,fields,go){window._f=[];sheet(title,[["Save",()=>go(...fields.map((_,i)=>window._f[i]||""))]],fields.map((f,i)=>`<div style="padding:4px 16px"><input class="srch" style="margin:0;width:100%;box-sizing:border-box" type="password" placeholder="${f}" autocomplete="off" oninput="_f[${i}]=this.value"></div>`).join(""))}
