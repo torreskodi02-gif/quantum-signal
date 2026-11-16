@@ -32,7 +32,14 @@ object Upd {
             var code = 0; var url: String? = null; var err: String? = null
             try {
                 val j = JSONObject(open(API).inputStream.bufferedReader().readText())
-                code = j.getString("tag_name").trim('v', 'V').toInt()
+                // The 'latest' release is tagged "latest", not a version
+                // number, so a tag parse would throw on every check. The
+                // workflow writes "versionCode N" into the release notes;
+                // read that, and only fall back to a numeric tag.
+                val body = j.optString("body", "")
+                code = Regex("versionCode (\\d+)").find(body)?.groupValues?.get(1)?.toIntOrNull()
+                    ?: j.optString("tag_name", "").trim('v', 'V').toIntOrNull() ?: 0
+                if (code == 0) err = "Couldn't determine the latest version from the release."
                 val a = j.getJSONArray("assets")
                 for (i in 0 until a.length()) if (a.getJSONObject(i).getString("name") == "quantumsignal.apk") url = a.getJSONObject(i).getString("browser_download_url")
             } catch (e: Exception) { err = "Couldn't reach the update server. Check your connection." }
