@@ -126,7 +126,7 @@ const PK={autolock:{t:"Auto-lock",o:[[0,"Immediately"],[30,"After 30 seconds"],[
 const ACC=["#3a76f0","#6d4df2","#e0457b","#2fa36b","#e08a1e","#0e9fb5"];
 const fmt=t=>new Date(t).toLocaleTimeString([],{hour:"numeric",minute:"2-digit"});
 const fday=t=>new Date(t).toDateString()===new Date().toDateString()?fmt(t):new Date(t).toLocaleDateString([],{weekday:"short"});
-function seed(){return{mig:3,cfg:{server:CF,pin:null,bio:true,autolock:30,screenSec:true,receipts:true,notif:true,bg:true,permAsked:false,pushOn:false,pushReady:false,backup:true,permOff:false,incog:true,wipe10:false,theme:"system",acc:"#3a76f0",font:16,disap:0,cred:null,skin:"signal",bshape:"signal",bcol:"",inc:"plain",ts:"group"},chats:[{id:"Note to Self",name:"Note to Self",msgs:[],dis:0,ver:false,unread:0}]}}
+function seed(){return{mig:3,cfg:{server:CF,pin:null,bio:true,autolock:30,screenSec:true,receipts:true,notif:true,bg:true,permAsked:false,pushOn:false,pushReady:false,backup:true,permOff:false,incog:true,wipe10:false,theme:"system",acc:"#3a76f0",font:16,disap:0,cred:null,skin:"signal",bshape:"signal",bcol:"",inc:"plain",ts:"group",driveRt:null,driveAt:0,drivePkce:null},chats:[{id:"Note to Self",name:"Note to Self",msgs:[],dis:0,ver:false,unread:0}]}}
 let S,view="list",tab="chats",cur=null,q="",reply=null,locked=true,pin="",stage=0,first="",tries=0,until=0,hid=0;
 let PERM_ST=null;
 const C=()=>S.cfg,chat=()=>S.chats.find(c=>c.id===cur),last=c=>c.msgs.length?c.msgs[c.msgs.length-1].ts:0;
@@ -146,6 +146,8 @@ const Backup={
   ready(){return !!BK&&!!C().token&&!!C().hasPw&&C().backup!==false},
   mark(){if(C().backup!==false)this.dirty=true},
   snapshot(){return{v:1,ts:Date.now(),chats:S.chats}},
+  async blob(){const iv=crypto.getRandomValues(new Uint8Array(12));const ct=b64e(await crypto.subtle.encrypt({name:"AES-GCM",iv},BK,enc(JSON.stringify(this.snapshot()))));return{iv:b64e(iv),data:ct}},
+  async unblob(iv,data){let raw;try{raw=new TextDecoder().decode(await crypto.subtle.decrypt({name:"AES-GCM",iv:b64d(iv)},BK,b64d(data)))}catch(e){return{error:"badkey"}}let b;try{b=JSON.parse(raw)}catch(e){return{error:"bad backup"}}if(!b||b.v!==1||!Array.isArray(b.chats))return{error:"bad backup"};return b},
   async upload(force){
     if(!this.ready())return false;
     if(this.uploading)return false;
@@ -153,12 +155,11 @@ const Backup={
     this.uploading=true;
     const c0=saveCount;
     try{
-      const iv=crypto.getRandomValues(new Uint8Array(12));
-      const ct=b64e(await crypto.subtle.encrypt({name:"AES-GCM",iv},BK,enc(JSON.stringify(this.snapshot()))));
-      await Net.j("/backup",{method:"POST",body:JSON.stringify({u:C().user,iv:b64e(iv),data:ct})});
+      const b=await this.blob();
+      await Net.j("/backup",{method:"POST",body:JSON.stringify({u:C().user,iv:b.iv,data:b.data})});
       this.lastOk=Date.now();C().bkAt=this.lastOk;save();
       this.dirty=saveCount!==c0+1;
-      dlog("backup","uploaded, "+ct.length+" chars");
+      dlog("backup","uploaded, "+b.data.length+" chars");
       return true;
     }catch(e){
       dlog("backup","upload failed: "+(e.message||e));
@@ -172,11 +173,8 @@ const Backup={
     try{
       const d=await Net.j("/backup?u="+encodeURIComponent(C().user));
       if(!d||!d.data)return null;
-      let raw;
-      try{raw=new TextDecoder().decode(await crypto.subtle.decrypt({name:"AES-GCM",iv:b64d(d.iv)},BK,b64d(d.data)))}
-      catch(e){return{error:"badkey"}}
-      const b=JSON.parse(raw);
-      if(!b||b.v!==1||!Array.isArray(b.chats))return{error:"bad backup"};
+      const b=await this.unblob(d.iv,d.data);
+      if(b.error)return b;
       dlog("backup","downloaded, "+b.chats.length+" chats");
       return b;
     }catch(e){
@@ -208,7 +206,167 @@ const Backup={
   }
 };
 
-function load(){try{S=JSON.parse(localStorage.getItem(KEY))}catch(e){S=null}if(!S||!S.cfg)S=seed();S.cfg=Object.assign({bshape:"signal",bcol:"",inc:"plain",ts:"group",skin:"signal",notif:true,bg:true,permAsked:false,pushOn:false,pushReady:false,backup:true,permOff:false,twofa:false,idle:0,keyAlert:true,hidePrev:false,clipClear:false,keep:0,servers:[],autoSwitch:true},S.cfg);if(!S.cfg.server)S.cfg.server=CF;if(S.mig!==3){S.chats=S.chats.filter(c=>c.pub||c.id==="Note to Self");const n=S.chats.find(c=>c.id==="Note to Self");if(n&&n.msgs.length===1&&n.msgs[0].t.startsWith("Ideas:"))n.msgs=[];S.mig=3;save()}}
+/* Google Drive backup: the SAME encrypted backup blob as the server backup
+   (AES-GCM with the password-derived backup key BK, salt "qs-backup:") is
+   also stored in your own Google Drive, in the app's private appDataFolder.
+   Google only ever sees ciphertext, and the drive.appdata scope means the
+   app can ONLY see its own backup file — never your other Drive files.
+   OAuth 2.0 with PKCE (no client secret in the app). The refresh token is
+   sealed with BK before it is stored, so even a copy of this phone's
+   storage cannot use it without your password.
+   Needs a Google Cloud OAuth client ID (DRIVE_CLIENT_ID below). Until
+   Kodi sets it, Drive backup stays off and the server backup keeps
+   working. The redirect page is www/oauth.html (GitHub Pages). */
+const DRIVE_CLIENT_ID="YOUR_GOOGLE_OAUTH_CLIENT_ID"; // <-- set from Google Cloud Console
+const DRIVE_REDIRECT="https://torreskodi02-gif.github.io/quantum-signal/oauth.html";
+const DRIVE_SCOPE="https://www.googleapis.com/auth/drive.appdata";
+const DRIVE_FILE="quantum-signal-backup.json";
+const Drive={
+  at:null,atExp:0,uploading:false,
+  connected(){return !!C().driveRt&&!!BK},
+  async seal(rt){const iv=crypto.getRandomValues(new Uint8Array(12));return b64e(iv)+"."+b64e(await crypto.subtle.encrypt({name:"AES-GCM",iv},BK,enc(rt)))},
+  async unseal(s){try{const p=String(s||"").split(".");return new TextDecoder().decode(await crypto.subtle.decrypt({name:"AES-GCM",iv:b64d(p[0])},BK,b64d(p[1])))}catch(e){return null}},
+  async pkce(){const v=b64e(crypto.getRandomValues(new Uint8Array(32))).replace(/\+/g,"-").replace(/\//g,"_").replace(/=+$/,"");const ch=b64e(new Uint8Array(await crypto.subtle.digest("SHA-256",enc(v)))).replace(/\+/g,"-").replace(/\//g,"_").replace(/=+$/,"");return{v,c:ch}},
+  async connect(){
+    if(!C().hasPw)return toast("Add a password first to turn on cloud backup");
+    if(!BK)return toast("Log in first");
+    if(DRIVE_CLIENT_ID.indexOf("YOUR_GOOGLE")===0)return toast("Google Drive isn’t set up yet — ask Merlin for the setup steps.");
+    try{
+      const p=await this.pkce();C().drivePkce=p.v;save();
+      const u="https://accounts.google.com/o/oauth2/v2/auth?client_id="+encodeURIComponent(DRIVE_CLIENT_ID)+"&redirect_uri="+encodeURIComponent(DRIVE_REDIRECT)+"&response_type=code&scope="+encodeURIComponent(DRIVE_SCOPE)+"&access_type=offline&prompt=consent&code_challenge="+encodeURIComponent(p.c)+"&code_challenge_method=S256&state=qs-drive";
+      const B=window.Capacitor&&Capacitor.Plugins&&Capacitor.Plugins.Browser;
+      if(B){await B.open({url:u})}else{window.open(u,"_blank")}
+      toast("Sign in with Google, then come back here");
+      dlog("drive","oauth started");
+    }catch(e){logErr("drive-connect",e.message||e);toast("Couldn’t open Google sign-in")}
+  },
+  async onCode(code){
+    if(!code)return;
+    if(!C().drivePkce)return toast("Start the Google sign-in from Settings first");
+    try{
+      toast("Connecting Google Drive…");
+      const t=await this.exchange(code);
+      if(!t||!t.refresh_token)throw new Error("no refresh token — try connecting again");
+      C().driveRt=await this.seal(t.refresh_token);C().drivePkce=null;save();
+      this.at=t.access_token;this.atExp=Date.now()+(t.expires_in||3600)*1000;
+      toast("Google Drive connected");dlog("drive","connected");
+      render();
+    }catch(e){logErr("drive-code",e.message||e);toast("Couldn’t connect Google Drive: "+(e.message||e))}
+  },
+  async exchange(code){
+    const body=new URLSearchParams({code,client_id:DRIVE_CLIENT_ID,code_verifier:C().drivePkce,redirect_uri:DRIVE_REDIRECT,grant_type:"authorization_code"});
+    const r=await fetch("https://oauth2.googleapis.com/token",{method:"POST",headers:{"content-type":"application/x-www-form-urlencoded"},body});
+    if(!r.ok)throw new Error("token exchange failed ("+r.status+")");
+    return r.json();
+  },
+  async refresh(){
+    const rt=await this.unseal(C().driveRt||"");
+    if(!rt)throw new Error("no drive token");
+    const body=new URLSearchParams({refresh_token:rt,client_id:DRIVE_CLIENT_ID,grant_type:"refresh_token"});
+    const r=await fetch("https://oauth2.googleapis.com/token",{method:"POST",headers:{"content-type":"application/x-www-form-urlencoded"},body});
+    if(!r.ok)throw new Error("token refresh failed ("+r.status+")");
+    const t=await r.json();
+    this.at=t.access_token;this.atExp=Date.now()+(t.expires_in||3600)*1000;
+    return this.at;
+  },
+  async token(){
+    if(this.at&&Date.now()<this.atExp-60000)return this.at;
+    return this.refresh();
+  },
+  async findFile(){
+    const tk=await this.token();
+    const q="name='"+DRIVE_FILE+"' and 'appDataFolder' in parents";
+    const r=await fetch("https://www.googleapis.com/drive/v3/files?q="+encodeURIComponent(q)+"&spaces=appDataFolder&fields=files(id,name,modifiedTime)",{headers:{authorization:"Bearer "+tk}});
+    if(!r.ok)throw new Error("drive list failed ("+r.status+")");
+    const d=await r.json();
+    return (d.files&&d.files[0])||null;
+  },
+  async upload(force){
+    if(!this.connected())return false;
+    if(this.uploading)return false;
+    if(!force&&Date.now()-(C().driveAt||0)<300000)return false;
+    this.uploading=true;
+    try{
+      const b=await Backup.blob();
+      const payload=JSON.stringify({v:1,iv:b.iv,data:b.data,ts:Date.now()});
+      const tk=await this.token();
+      const existing=await this.findFile();
+      if(existing){
+        const r=await fetch("https://www.googleapis.com/upload/drive/v3/files/"+existing.id+"?uploadType=media",{method:"PATCH",headers:{authorization:"Bearer "+tk,"content-type":"application/json"},body:payload});
+        if(!r.ok)throw new Error("drive update failed ("+r.status+")");
+      }else{
+        const boundary="qs"+Date.now().toString(36);
+        const meta=JSON.stringify({name:DRIVE_FILE,parents:["appDataFolder"]});
+        const body="--"+boundary+"\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n"+meta+"\r\n--"+boundary+"\r\nContent-Type: application/json\r\n\r\n"+payload+"\r\n--"+boundary+"--";
+        const r=await fetch("https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart",{method:"POST",headers:{authorization:"Bearer "+tk,"content-type":"multipart/related; boundary="+boundary},body});
+        if(!r.ok)throw new Error("drive upload failed ("+r.status+")");
+      }
+      C().driveAt=Date.now();save();
+      dlog("drive","uploaded backup");
+      return true;
+    }catch(e){
+      dlog("drive","upload failed: "+(e.message||e));
+      logErr("drive",e.message||e);
+      return false;
+    }finally{this.uploading=false}
+  },
+  async download(){
+    if(!this.connected())return null;
+    try{
+      const f=await this.findFile();
+      if(!f)return null;
+      const tk=await this.token();
+      const r=await fetch("https://www.googleapis.com/drive/v3/files/"+f.id+"?alt=media",{headers:{authorization:"Bearer "+tk}});
+      if(!r.ok)throw new Error("drive download failed ("+r.status+")");
+      const j=await r.json();
+      if(!j||!j.iv||!j.data)return{error:"bad backup"};
+      return Backup.unblob(j.iv,j.data);
+    }catch(e){
+      dlog("drive","download failed: "+(e.message||e));
+      return{error:e.message||e};
+    }
+  },
+  async restore(force){
+    const b=await this.download();
+    if(!b)return false;
+    if(b.error){toast(b.error==="badkey"?"This backup was made with a different password. Log in with the password you used when it was backed up.":"Couldn’t restore the Drive backup: "+b.error);return false}
+    const hasLocal=S.chats.some(c=>c.id!=="Note to Self"&&c.msgs.length);
+    if(hasLocal&&!force)return false;
+    S.chats=b.chats;S.ack=[];save();Backup.dirty=false;if(view==="chat")renderMsgs();else render();
+    toast("Restored "+b.chats.length+" chats from Google Drive");
+    dlog("drive","restored "+b.chats.length+" chats");
+    return true;
+  },
+  async remove(){
+    try{
+      const f=await this.findFile().catch(()=>null);
+      if(f){const tk=await this.token().catch(()=>null);if(tk)await fetch("https://www.googleapis.com/drive/v3/files/"+f.id,{method:"DELETE",headers:{authorization:"Bearer "+tk}}).catch(()=>{})}
+    }catch(e){}
+    try{
+      const rt=await this.unseal(C().driveRt||"").catch(()=>null);
+      if(rt)await fetch("https://oauth2.googleapis.com/revoke",{method:"POST",headers:{"content-type":"application/x-www-form-urlencoded"},body:"token="+encodeURIComponent(rt)}).catch(()=>{});
+    }catch(e){}
+    C().driveRt=null;C().driveAt=0;C().drivePkce=null;this.at=null;this.atExp=0;save();
+    toast("Google Drive disconnected");dlog("drive","disconnected");
+  },
+  listen(){
+    try{
+      const A=window.Capacitor&&Capacitor.Plugins&&Capacitor.Plugins.App;
+      if(A&&A.addListener)A.addListener("appUrlOpen",({url})=>{
+        try{
+          const u=String(url||"");
+          if(u.indexOf("://oauth")<0)return;
+          const m=u.match(/[?&]code=([^&]+)/);
+          if(m)Drive.onCode(decodeURIComponent(m[1]));
+          else if(/error=/.test(u))toast("Google sign-in was cancelled");
+        }catch(e){logErr("drive-url",e.message||e)}
+      });
+    }catch(e){}
+  }
+};
+
+
+function load(){try{S=JSON.parse(localStorage.getItem(KEY))}catch(e){S=null}if(!S||!S.cfg)S=seed();S.cfg=Object.assign({bshape:"signal",bcol:"",inc:"plain",ts:"group",skin:"signal",notif:true,bg:true,permAsked:false,pushOn:false,pushReady:false,backup:true,permOff:false,twofa:false,idle:0,keyAlert:true,hidePrev:false,clipClear:false,keep:0,servers:[],autoSwitch:true,driveRt:null,driveAt:0,drivePkce:null},S.cfg);if(!S.cfg.server)S.cfg.server=CF;if(S.mig!==3){S.chats=S.chats.filter(c=>c.pub||c.id==="Note to Self");const n=S.chats.find(c=>c.id==="Note to Self");if(n&&n.msgs.length===1&&n.msgs[0].t.startsWith("Ideas:"))n.msgs=[];S.mig=3;save()}}
 function applyTheme(){const r=document.documentElement;r.dataset.theme=C().theme==="system"?"":C().theme;r.style.setProperty("--acc",C().acc);r.style.setProperty("--fs",C().font+"px");const k=SK[C().skin]||SK.signal;r.style.setProperty("--rad",k.rad+"px");r.style.setProperty("--wall",k.wall||"var(--bg)");k.wall==="#000"?r.style.setProperty("--bg","#000"):r.style.removeProperty("--bg");document.body.style.fontFamily=k.f||"";r.style.setProperty("--bo",C().bcol||"var(--acc)");r.style.setProperty("--rad",({signal:18,soft:24,sharp:6})[C().bshape||"signal"]+"px");r.dataset.inc=C().inc||"plain"}
 function toast(t){const d=document.createElement("div");d.className="toast";d.textContent=t;document.body.append(d);setTimeout(()=>d.remove(),2400)}
 function sheet(t,items,html=""){const d=document.createElement("div");d.className="sh";d.innerHTML=`<div class="bx"><h4>${t}</h4>${html}${items.map((x,i)=>`<button data-i="${i}">${x[0]}</button>`).join("")}</div>`;d.onclick=e=>{const b=e.target.closest("button");if(b){d.remove();items[b.dataset.i][1]()}else if(e.target===d)d.remove()};document.body.append(d)}
@@ -246,7 +404,7 @@ return`<div class="pg">${upCard()}<div class="grp"><h3>Troubleshooting</h3>${act
 <div class="grp"><h3>Appearance</h3><div class="row" data-a="skins"><div><b>Style</b></div><small>${(SK[c.skin]||SK.signal).n}</small></div>${pk("theme","Theme")}${pk("font","Message size")}<div class="sw2">${ACC.map(a=>`<i data-a="acc" data-v="${a}" class="${c.acc===a?"on":""}" style="background:${a}"></i>`).join("")}</div></div>
 <div class="grp"><h3>Advanced security</h3>${tg("twofa","Fingerprint + PIN","Require both to unlock")}${pk("idle","Lock when idle")}${tg("keyAlert","Contact key change alerts","Warn if someone’s encryption key changes")}${tg("hidePrev","Hide message previews","Don’t show message text in the chat list")}${tg("clipClear","Clear clipboard after copying","Wipes copied text after 30 seconds")}${pk("keep","Delete old messages")}</div>
 <div class="grp"><h3>Chat bubbles</h3>${pk("bshape","Bubble shape")}${pk("inc","Incoming bubbles")}${pk("ts","Timestamps")}<div class="row" style="cursor:default"><div><b>Sent bubble colour</b></div></div><div class="sw2">${BC.map(x=>`<i data-a="bcol" data-v="${x}" class="${(c.bcol||"")===x?"on":""}" style="background:${x||c.acc}"></i>`).join("")}</div></div>
-<div class="grp"><h3>Network and updates</h3>${act("server","Server address",(c.server||"Not set")+(c.token&&online===false?" · offline":""))}${act("servers","Servers",srvSummary())}${c.server!==CF?act("usecf","Use Cloudflare for messages","Move your account to your Cloudflare server"):""}</div><div class="grp"><h3>Cloud backup</h3>${tg("backup","Cloud backup","Save your chats encrypted to the cloud so they come back when you log in again")}${act("bkupnow","Back up now",C().hasPw?(C().bkAt?("Last backup "+new Date(C().bkAt).toLocaleString()):"No backup yet"):"Add a password first to turn on cloud backup")}${act("bkrestore","Restore from backup","Download your cloud backup and restore your chats")}${act("bkdel","Delete cloud backup","Erase the backup from the server","dng")}</div>
+<div class="grp"><h3>Network and updates</h3>${act("server","Server address",(c.server||"Not set")+(c.token&&online===false?" · offline":""))}${act("servers","Servers",srvSummary())}${c.server!==CF?act("usecf","Use Cloudflare for messages","Move your account to your Cloudflare server"):""}</div><div class="grp"><h3>Cloud backup</h3>${tg("backup","Cloud backup","Save your chats encrypted to the cloud so they come back when you log in again")}${act("bkupnow","Back up now",C().hasPw?(C().bkAt?("Last backup "+new Date(C().bkAt).toLocaleString()):"No backup yet"):"Add a password first to turn on cloud backup")}${act("bkrestore","Restore from backup","Download your cloud backup and restore your chats")}${act("bkdel","Delete cloud backup","Erase the backup from the server","dng")}${act("driveConn",C().driveRt?"Google Drive: connected":"Connect Google Drive",C().driveRt?(C().driveAt?("Last Drive backup "+new Date(C().driveAt).toLocaleString()):"Connected — no Drive backup yet"):"Back up your encrypted chats to your own Google Drive")}${!C().driveRt?act("driveCode","Paste Google sign-in code","If the app didn’t open after signing in, paste the code here"):""}${C().driveRt?act("driveNow","Back up to Google Drive","Upload the encrypted backup to your Drive"):""}${C().driveRt?act("driveRestore","Restore from Google Drive","Download your Drive backup and restore your chats"):""}${C().driveRt?act("driveDel","Disconnect Google Drive","Remove the Drive backup and disconnect","dng"):""}</div>
 <div class="grp"><h3>Account</h3>${act("fp","Test fingerprint","Check that your fingerprint sensor works")}${act("pin","Change PIN","Set a new 4-digit PIN")}${act("lock","Lock now","Require PIN or fingerprint to reopen")}${act("pw",c.hasPw?"Change password":"Add a password",c.hasPw?"Update the password you log in with":"So you can log in on another phone")}${act("logout","Log out","Remove this account from this phone")}${act("logoutall","Log out of all other devices","End sessions on your other phones")}${act("resetnet","Reset server account","Remove your username and keys from this phone")}${act("panic","Panic wipe","Erase every chat, setting and PIN","dng")}</div><p class="hint">Quantum Signal v${VER}</p></div>`}
 function chatHTML(){const c=chat();return`<header class="ch"><button data-a="back" aria-label="Back">${ic("back")}</button><div class="who" data-a="info">${av(c.name,38)}<div><b>${E(c.name)}</b><small>${c.ver?"✓ Verified · ":""}${c.dis?"⏱ "+DL[c.dis]:"🔒 End-to-end encrypted"}</small></div></div><button data-a="call" data-v="voice" aria-label="Voice call">${ic("phone")}</button><button data-a="call" data-v="video" aria-label="Video call">${ic("video")}</button><button data-a="cmenu" aria-label="More">${ic("more")}</button></header><div id="msgs"></div><div id="rp"></div><div class="bar"><input id="inp" placeholder="Message" autocomplete="off" ${C().incog?'autocorrect="off" spellcheck="false" autocapitalize="sentences"':""}><button class="snd" data-a="send" aria-label="Send">${ic("send")}</button></div>`}
 function renderMsgs(){const el=$("#msgs");if(!el||view!=="chat")return;const M=chat().msgs,mode=C().ts||"group";let h="",pd="";
@@ -300,9 +458,9 @@ panic(){sheet("Wipe all data?",[["Yes, wipe everything now",wipe]],'<p class="hi
 document.addEventListener("click",e=>{const el=e.target.closest("[data-a]");if(el&&A[el.dataset.a])A[el.dataset.a](el.dataset.v)});
 document.addEventListener("input",e=>{if(e.target.id==="sq"){q=e.target.value;$("#cl").innerHTML=rows()}});
 document.addEventListener("keydown",e=>{if(e.key==="Enter"&&e.target.id==="inp")send();if(e.key==="Enter"&&["au","ap","ap2"].includes(e.target.id))A.authgo()});
-document.addEventListener("visibilitychange",()=>{try{if(document.hidden){hid=Date.now();releaseWakeLock();dlog("vis","app hidden — starting background service");fgStart();if(Backup.dirty)Backup.upload(true);if(C().screenSec)document.body.classList.add("priv")}else{document.body.classList.remove("priv");document.title="Quantum Signal";try{if("clearAppBadge" in navigator)navigator.clearAppBadge().catch(()=>{})}catch(e){}acquireWakeLock();fgStop();dlog("vis","app visible");chkUp();refreshPerms();if(!locked&&C().pin&&(Date.now()-hid)/1000>=C().autolock){locked=true;pin="";render()}else if(!locked){restartPoll();poll()}}}catch(e){logErr("visibility",e.message||e)}});
+document.addEventListener("visibilitychange",()=>{try{if(document.hidden){hid=Date.now();releaseWakeLock();dlog("vis","app hidden — starting background service");fgStart();if(Backup.dirty){Backup.upload(true);Drive.upload(true)}if(C().screenSec)document.body.classList.add("priv")}else{document.body.classList.remove("priv");document.title="Quantum Signal";try{if("clearAppBadge" in navigator)navigator.clearAppBadge().catch(()=>{})}catch(e){}acquireWakeLock();fgStop();dlog("vis","app visible");chkUp();refreshPerms();if(!locked&&C().pin&&(Date.now()-hid)/1000>=C().autolock){locked=true;pin="";render()}else if(!locked){restartPoll();poll()}}}catch(e){logErr("visibility",e.message||e)}});
 setInterval(()=>{const n=Date.now();let ch=0;if(!locked&&C().pin&&C().idle&&n-lastAct>C().idle*6e4){locked=true;pin="";render()}S.chats.forEach(c=>{const k=c.msgs.length;c.msgs=c.msgs.filter(m=>(!m.exp||m.exp>n)&&(!C().keep||n-m.ts<C().keep*864e5));if(c.msgs.length!==k)ch=1});if(ch&&!locked){save();view==="chat"?renderMsgs():render()}},1000);
-const VER="0.9.2";
+const VER="0.9.3";
 const APK_URL="https://github.com/torreskodi02-gif/quantum-signal/releases/download/latest/quantum-signal.apk";
 const SK={signal:{n:"Signal",acc:"#3a76f0",rad:18,wall:"",f:""},ios:{n:"iOS",acc:"#0a84ff",rad:20,wall:"",f:"-apple-system,BlinkMacSystemFont,'SF Pro Text',system-ui,sans-serif"},midnight:{n:"Midnight (OLED)",acc:"#8b5cf6",rad:16,wall:"#000",f:"",dark:1},aurora:{n:"Aurora",acc:"#14b8a6",rad:22,wall:"linear-gradient(160deg,#0f2027,#203a43,#2c5364)",f:"",dark:1},sunset:{n:"Sunset",acc:"#f97316",rad:20,wall:"linear-gradient(160deg,#fff1e6,#ffe0f0)",f:"",light:1}};
 /* End-to-end encryption: ECDH P-256 key agreement + AES-GCM. Server only ever sees ciphertext. */
@@ -370,7 +528,7 @@ for(const k in dl)tx(dl[k].c,{k:"d",ids:dl[k].ids}).catch(()=>{});
 if(view==="chat")markRead(chat())}catch(e){online=false;pollFails++;if(pollFails===1)toast("No connection. Will keep retrying.");if(!(e.name==="AbortError"&&pollCtl&&pollCtl.manual))logErr("poll",Net.msg(e));if(e.message==="auth"&&!authWarned){authWarned=true;toast("The server doesn’t recognise your account. Settings → Account → Reset server account.")}}}
 function retryFailed(){if(!C().token)return;S.chats.forEach(c=>c.pub&&c.msgs.forEach(m=>{if(m.me&&m.st===-1&&!m.perm&&(m.tries||0)<50&&Date.now()-(m.lt||0)>Math.min(2e3*2**(m.tries||0),6e4))relay(c,m)}));}
 setInterval(retryFailed,2000);
-setInterval(()=>{if(Backup.dirty)Backup.upload(false)},30000);
+setInterval(()=>{if(Backup.dirty){Backup.upload(false);Drive.upload(false)}},30000);
 let legacyInbox=false,pollCtl=null;
 function restartPoll(){if(pollCtl){pollCtl.manual=1;pollCtl.abort()}}
 function done(id){if(legacyInbox||!id)return;const a=S.ack||(S.ack=[]);if(!a.includes(id))a.push(id)}
@@ -524,7 +682,7 @@ try{await(su?Net.signup(u,pw):Net.login(u,pw));authBusy=false;locked=!C().pin;vi
 catch(e){authBusy=false;logErr("auth",e);const m=authErr(e);render();const el=$("#aerr");if(el)el.textContent=m}},
 pw(){const has=!!C().hasPw;form(has?"Change password":"Add a password",has?["Current password","New password (8+ characters)","Confirm new password"]:["New password (8+ characters)","Confirm password"],async(...v)=>{const[old,n1,n2]=has?v:["",v[0],v[1]];
 if(n1.length<12)return toast("New password needs at least 12 characters");if(isCommonPw(n1))return toast("That password is too common. Pick a stronger one");if(n1!==n2)return toast("The new passwords don’t match");
-try{toast("Saving…");const u=C().user,n=await kdf(u,n1),body={u,auth:n.auth,vault:await seal(C().priv,n.key)};if(has)body.old=(await kdf(u,old)).auth;await Net.j("/password",{method:"POST",body:JSON.stringify(body)});C().hasPw=true;save();render();toast("Password saved");bkdf(u,n1).then(k=>{BK=k;Backup.upload(true)}).catch(()=>{})}
+try{toast("Saving…");const u=C().user,n=await kdf(u,n1),body={u,auth:n.auth,vault:await seal(C().priv,n.key)};if(has)body.old=(await kdf(u,old)).auth;await Net.j("/password",{method:"POST",body:JSON.stringify(body)});C().hasPw=true;save();render();toast("Password saved");bkdf(u,n1).then(async k=>{let rt=null;if(C().driveRt){try{rt=await Drive.unseal(C().driveRt)}catch(e){}}BK=k;if(rt){try{C().driveRt=await Drive.seal(rt)}catch(e){}}save();Backup.upload(true);Drive.upload(true)}).catch(()=>{})}
 catch(e){toast(e.message==="login"?"Current password is wrong":e.message==="too many attempts"?"Too many attempts. Try again later":"Couldn’t save: "+Net.msg(e))}})},
 logout(){if(!C().hasPw)return toast("Add a password first, or you won’t be able to log back in");
 sheet("Log out?",[["Log out and erase this phone’s chats",async()=>{try{await Net.j("/logout",{method:"POST",body:JSON.stringify({u:C().user})})}catch(e){}Object.assign(C(),{user:null,token:null,pub:null,priv:null,hasPw:false});BK=null;S.chats=[noteChat()];S.ack=[];save();restartPoll();locked=false;view="list";tab="chats";authTab="login";render()}]],'<p class="hint">Messages already delivered to this phone are erased. Log in again with your password to get your account back here or on another phone. Past messages can’t be restored.</p>')},
@@ -669,7 +827,12 @@ Object.assign(A,{perms(){Perms.sheet()}});
 Object.assign(A,{
   async bkupnow(){if(!C().hasPw)return toast("Add a password first to turn on cloud backup");if(!C().token)return toast("Log in first");toast("Backing up…");const ok=await Backup.upload(true);toast(ok?"Backup saved to the cloud":"Couldn’t back up — check the debug log");render()},
   bkrestore(){if(!C().token)return toast("Log in first");const hasLocal=S.chats.some(c=>c.id!=="Note to Self"&&c.msgs.length);if(hasLocal)sheet("Restore from backup?",[["Replace my chats with the backup",async()=>{await Backup.restore(true)}]],'<p class="hint">This replaces the chats on this phone with the cloud backup. Messages sent after the backup was made will be lost from this phone.</p>');else Backup.restore(true)},
-  bkdel(){sheet("Delete the cloud backup?",[["Delete backup",async()=>{await Backup.remove()}]],'<p class="hint">Erases your encrypted backup from the server. Your chats stay on this phone.</p>')}
+  bkdel(){sheet("Delete the cloud backup?",[["Delete backup",async()=>{await Backup.remove()}]],'<p class="hint">Erases your encrypted backup from the server. Your chats stay on this phone.</p>')},
+  async driveConn(){if(C().driveRt){toast("Google Drive is already connected");return}await Drive.connect()},
+  driveCode(){ask("Google sign-in code","Paste the code from the Google page",async v=>{if(v)await Drive.onCode(v.trim())})},
+  async driveNow(){if(!C().driveRt)return toast("Connect Google Drive first");if(!C().hasPw)return toast("Add a password first to turn on cloud backup");if(!C().token)return toast("Log in first");toast("Backing up to Google Drive…");const ok=await Drive.upload(true);toast(ok?"Backup saved to Google Drive":"Couldn’t back up to Drive — check the debug log");render()},
+  driveRestore(){if(!C().driveRt)return toast("Connect Google Drive first");if(!C().token)return toast("Log in first");const hasLocal=S.chats.some(c=>c.id!=="Note to Self"&&c.msgs.length);if(hasLocal)sheet("Restore from Google Drive?",[["Replace my chats with the Drive backup",async()=>{await Drive.restore(true)}]],'<p class="hint">This replaces the chats on this phone with the Google Drive backup. Messages sent after the backup was made will be lost from this phone.</p>');else Drive.restore(true)},
+  driveDel(){if(!C().driveRt)return;sheet("Disconnect Google Drive?",[["Disconnect and delete Drive backup",async()=>{await Drive.remove();render()}]],'<p class="hint">Erases the encrypted backup from your Google Drive and disconnects. Your chats stay on this phone.</p>')}
 });
 setTimeout(()=>{try{if(C().token)askPerms()}catch(e){}},2000);
 setTimeout(()=>{try{Push.register()}catch(e){}},3000);
@@ -875,7 +1038,7 @@ A.updgo=()=>UP.s==="avail"?applyUp():chkUp();
 A.apkupd=async()=>{toast("Downloading the newest app — tap the downloaded file, then Install");await openApk()};
 A.upd=s=>chkUp(!!s);
 const t0=A.tab;A.tab=v=>{t0(v);if(v==="set")chkUp()};
-load();applyTheme();render();if(Bio.native()&&C().bio&&C().pin&&!C().twofa)setTimeout(A.bio,400);setTimeout(()=>A.upd(1),400);
+load();applyTheme();render();Drive.listen();if(Bio.native()&&C().bio&&C().pin&&!C().twofa)setTimeout(A.bio,400);setTimeout(()=>A.upd(1),400);
 setInterval(()=>chkUp(false),15*60*1000);
 setInterval(()=>refreshPerms(),60000);
 </script></body></html>

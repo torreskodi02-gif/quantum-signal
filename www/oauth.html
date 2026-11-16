@@ -1,0 +1,25 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Quantum Signal — Google sign-in</title>
+<style>body{font-family:system-ui,sans-serif;background:#0b0f14;color:#e6edf3;padding:24px;max-width:480px;margin:0 auto}h1{font-size:20px}a{color:#3a76f0}code{word-break:break-all;background:#161d27;padding:10px;border-radius:8px;display:block;margin:12px 0}button{background:#3a76f0;color:#fff;border:0;border-radius:10px;padding:12px 18px;font-size:16px;cursor:pointer}</style>
+</head><body>
+<h1>Quantum Signal — Google sign-in</h1>
+<p id="msg">Connecting you back to the app…</p>
+<div id="fb" style="display:none">
+<p>If the app didn’t open, copy this code and paste it in Quantum Signal → Settings → Cloud backup → “Paste Google sign-in code”.</p>
+<code id="code"></code>
+<button onclick="navigator.clipboard&&navigator.clipboard.writeText(document.getElementById('code').textContent).then(()=>{this.textContent='Copied!'})">Copy code</button>
+<p><a href="#" onclick="tryOpen();return false">Try opening the app again</a></p>
+</div>
+<script>
+var q=new URLSearchParams(location.search);
+var code=q.get("code"),err=q.get("error");
+function tryOpen(){if(code)location.href="app.quantumsignal://oauth?code="+encodeURIComponent(code)}
+if(err){document.getElementById("msg").textContent="Google sign-in was cancelled or failed ("+err+"). You can close this page and try again in the app."}
+else if(code){
+  document.getElementById("code").textContent=code;
+  tryOpen();
+  setTimeout(function(){document.getElementById("fb").style.display="block";document.getElementById("msg").textContent="If the app opened, you’re done — you can close this page."},1500);
+}else{document.getElementById("msg").textContent="No sign-in code found. Close this page and try again in the app."}
+</script>
+</body></html>
