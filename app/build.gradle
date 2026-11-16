@@ -15,6 +15,16 @@ plugins {
     id 'org.jetbrains.kotlin.android'
 }
 
+// versionCode source: CI sets VC = GitHub run number; 1 for local builds.
+// NOTE: keep this as a separate variable. Writing
+//   versionCode (System.getenv('VC') ?: '1').toInteger()
+// inline breaks the build: Groovy parses it as
+//   (versionCode(...)).toInteger(), and versionCode is a setter that
+// returns void/null, so .toInteger() on null fails with "Value is null"
+// at project evaluation time. The old notes app did it this way and
+// built fine (v26-v30); the native rewrite inlined it and broke it.
+def vc = System.getenv('VC') ?: '1'
+
 android {
     namespace 'app.quantumsignal'
     compileSdk 34
@@ -24,7 +34,7 @@ android {
         minSdk 23
         targetSdk 34
         // versionCode comes from CI (VC = GitHub run number); 1 for local builds.
-        versionCode (System.getenv('VC') ?: '1').toInteger()
+        versionCode vc.toInteger()
         versionName '1.0.0'
     }
 
