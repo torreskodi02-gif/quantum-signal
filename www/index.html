@@ -96,13 +96,29 @@ body.priv::after{content:"Quantum Signal";position:fixed;inset:0;background:var(
 .fi{padding:14px 16px;border-radius:14px;border:1px solid var(--ln);background:var(--sf);color:var(--tx);font:inherit;font-size:16px;width:100%;box-sizing:border-box}
 .err{color:#d92d20;min-height:1.3em;font-size:14px;margin:0}.rbtn.wide{width:100%;padding:14px;margin-top:0}.rbtn:disabled{opacity:.6}
 .sv a{color:var(--acc);cursor:pointer;margin-left:6px}
+.call{position:fixed;inset:0;background:#0b0f14;color:#fff;z-index:200;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;text-align:center}
+.call .rv{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;background:#000}
+.call .lv{position:absolute;right:14px;top:14px;width:110px;height:150px;border-radius:12px;object-fit:cover;background:#222;border:2px solid rgba(255,255,255,.4);z-index:3}
+.call .ctop{position:absolute;top:26px;left:0;right:0;z-index:2;text-shadow:0 1px 6px rgba(0,0,0,.7)}
+.call .ctop b{font-size:20px}
+.call .ctop div{font-size:14px;opacity:.85}
+.call .who2{position:relative;z-index:2}
+.call .av2{width:96px;height:96px;border-radius:50%;background:var(--acc,#3a76f0);display:flex;align-items:center;justify-content:center;font-size:38px;font-weight:700;margin:0 auto 10px}
+.call .who2 h2{font-size:22px;margin:0 0 4px}
+.call .who2 div{font-size:14px;opacity:.85}
+.call .ctrl{position:absolute;bottom:30px;left:0;right:0;display:flex;justify-content:center;gap:14px;z-index:2}
+.call .cb{width:56px;height:56px;border-radius:50%;border:0;background:rgba(255,255,255,.18);color:#fff;display:flex;align-items:center;justify-content:center;cursor:pointer}
+.call .cb.off{background:#e5484d}
+.call .cb.end{background:#e5484d;width:64px;height:64px}
+.call .code{position:absolute;bottom:112px;left:0;right:0;font-size:12px;opacity:.7;z-index:2;padding:0 20px}
+.callog{text-align:center;color:#8a94a6;font-size:12px;padding:4px 0}
 </style></head><body><div id="app"></div>
 <script>
 const $=s=>document.querySelector(s),KEY="qs_v1";
 const E=s=>String(s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
 const H=s=>{let h=0;for(const c of s)h=(h*31+c.charCodeAt(0))>>>0;return h};
 const COL=["#3a76f0","#e0457b","#2fa36b","#e08a1e","#8a5cf6","#0e9fb5"];
-const P={back:'<path d="M15 5l-7 7 7 7"/>',search:'<circle cx="11" cy="11" r="6"/><path d="M16 16l5 5"/>',send:'<path d="M4 12l16-8-6 16-3-6z"/>',more:'<circle cx="12" cy="5" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="12" cy="19" r="1"/>',phone:'<path d="M5 4h4l2 5-2 1a11 11 0 005 5l1-2 5 2v4a2 2 0 01-2 2A16 16 0 013 6a2 2 0 012-2z"/>',edit:'<path d="M4 20h4L19 9l-4-4L4 16z"/>',clip:'<path d="M20 11l-8 8a5 5 0 01-7-7l8-8a3 3 0 014 4l-8 8a1 1 0 01-2-2l7-7"/>',fp:'<path d="M12 3a8 8 0 00-8 8v2M12 7a4 4 0 00-4 4v3a6 6 0 01-1 3M12 11v4a8 8 0 01-2 5M16 11a4 4 0 00-1-3M20 13v-2a8 8 0 00-3-6M16 15a14 14 0 01-1 4"/>',lock:'<rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 018 0v3"/>',x:'<path d="M6 6l12 12M18 6L6 18"/>',msg:'<path d="M4 5h16v11H9l-5 4z"/>',gear:'<circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M5 5l2 2M17 17l2 2M19 5l-2 2M7 17l-2 2"/>'};
+const P={back:'<path d="M15 5l-7 7 7 7"/>',search:'<circle cx="11" cy="11" r="6"/><path d="M16 16l5 5"/>',send:'<path d="M4 12l16-8-6 16-3-6z"/>',more:'<circle cx="12" cy="5" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="12" cy="19" r="1"/>',phone:'<path d="M5 4h4l2 5-2 1a11 11 0 005 5l1-2 5 2v4a2 2 0 01-2 2A16 16 0 013 6a2 2 0 012-2z"/>',edit:'<path d="M4 20h4L19 9l-4-4L4 16z"/>',clip:'<path d="M20 11l-8 8a5 5 0 01-7-7l8-8a3 3 0 014 4l-8 8a1 1 0 01-2-2l7-7"/>',fp:'<path d="M12 3a8 8 0 00-8 8v2M12 7a4 4 0 00-4 4v3a6 6 0 01-1 3M12 11v4a8 8 0 01-2 5M16 11a4 4 0 00-1-3M20 13v-2a8 8 0 00-3-6M16 15a14 14 0 01-1 4"/>',lock:'<rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 018 0v3"/>',x:'<path d="M6 6l12 12M18 6L6 18"/>',msg:'<path d="M4 5h16v11H9l-5 4z"/>',gear:'<circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M5 5l2 2M17 17l2 2M19 5l-2 2M7 17l-2 2"/>',video:'<rect x="2" y="6" width="13" height="12" rx="2"/><path d="M15 10l7-3v10l-7-3z"/>',mic:'<rect x="9" y="2" width="6" height="12" rx="3"/><path d="M5 10a7 7 0 0014 0M12 19v3"/>',micoff:'<path d="M3 3l18 18"/><rect x="9" y="2" width="6" height="12" rx="3"/><path d="M5 10a7 7 0 0014 0"/>',camoff:'<path d="M3 3l18 18"/><rect x="2" y="6" width="13" height="12" rx="2"/><path d="M15 10l7-3v10l-7-3z"/>',end:'<path d="M5 4h4l2 5-2 1a11 11 0 005 5l1-2 5 2v4a2 2 0 01-2 2A16 16 0 013 6a2 2 0 012-2z"/><path d="M3 3l18 18"/>'};
 const ic=(n,s=22)=>`<svg width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${P[n]}</svg>`;
 const av=(n,z=44)=>`<i class="av" style="width:${z}px;height:${z}px;background:${COL[H(n)%6]};font-size:${z*.42}px">${E(n[0])}</i>`;
 const DL={0:"Off",10:"10 seconds",60:"1 minute",3600:"1 hour",86400:"1 day"};
@@ -154,9 +170,10 @@ return`<div class="pg">${upCard()}<div class="grp"><h3>Troubleshooting</h3>${act
 <div class="grp"><h3>Chat bubbles</h3>${pk("bshape","Bubble shape")}${pk("inc","Incoming bubbles")}${pk("ts","Timestamps")}<div class="row" style="cursor:default"><div><b>Sent bubble colour</b></div></div><div class="sw2">${BC.map(x=>`<i data-a="bcol" data-v="${x}" class="${(c.bcol||"")===x?"on":""}" style="background:${x||c.acc}"></i>`).join("")}</div></div>
 <div class="grp"><h3>Network and updates</h3>${act("server","Server address",(c.server||"Not set")+(c.token&&online===false?" · offline":""))}${act("servers","Servers",srvSummary())}${c.server!==CF?act("usecf","Use Cloudflare for messages","Move your account to your Cloudflare server"):""}</div>
 <div class="grp"><h3>Account</h3>${act("fp","Test fingerprint","Check that your fingerprint sensor works")}${act("pin","Change PIN","Set a new 4-digit PIN")}${act("lock","Lock now","Require PIN or fingerprint to reopen")}${act("pw",c.hasPw?"Change password":"Add a password",c.hasPw?"Update the password you log in with":"So you can log in on another phone")}${act("logout","Log out","Remove this account from this phone")}${act("logoutall","Log out of all other devices","End sessions on your other phones")}${act("resetnet","Reset server account","Remove your username and keys from this phone")}${act("panic","Panic wipe","Erase every chat, setting and PIN","dng")}</div><p class="hint">Quantum Signal v${VER}</p></div>`}
-function chatHTML(){const c=chat();return`<header class="ch"><button data-a="back" aria-label="Back">${ic("back")}</button><div class="who" data-a="info">${av(c.name,38)}<div><b>${E(c.name)}</b><small>${c.ver?"✓ Verified · ":""}${c.dis?"⏱ "+DL[c.dis]:"🔒 End-to-end encrypted"}</small></div></div><button data-a="cmenu" aria-label="More">${ic("more")}</button></header><div id="msgs"></div><div id="rp"></div><div class="bar"><input id="inp" placeholder="Message" autocomplete="off" ${C().incog?'autocorrect="off" spellcheck="false" autocapitalize="sentences"':""}><button class="snd" data-a="send" aria-label="Send">${ic("send")}</button></div>`}
+function chatHTML(){const c=chat();return`<header class="ch"><button data-a="back" aria-label="Back">${ic("back")}</button><div class="who" data-a="info">${av(c.name,38)}<div><b>${E(c.name)}</b><small>${c.ver?"✓ Verified · ":""}${c.dis?"⏱ "+DL[c.dis]:"🔒 End-to-end encrypted"}</small></div></div><button data-a="call" data-v="voice" aria-label="Voice call">${ic("phone")}</button><button data-a="call" data-v="video" aria-label="Video call">${ic("video")}</button><button data-a="cmenu" aria-label="More">${ic("more")}</button></header><div id="msgs"></div><div id="rp"></div><div class="bar"><input id="inp" placeholder="Message" autocomplete="off" ${C().incog?'autocorrect="off" spellcheck="false" autocapitalize="sentences"':""}><button class="snd" data-a="send" aria-label="Send">${ic("send")}</button></div>`}
 function renderMsgs(){const el=$("#msgs");if(!el||view!=="chat")return;const M=chat().msgs,mode=C().ts||"group";let h="",pd="";
 M.forEach((m,i)=>{const p=M[i-1],n=M[i+1],d=new Date(m.ts).toDateString();if(d!==pd){h+=`<div class="day">${dayLbl(m.ts)}</div>`;pd=d}
+if(m.call){h+=`<div class="callog">${E(m.t)}</div>`;return}
 const gp=p&&p.me===m.me&&m.ts-p.ts<18e4&&new Date(p.ts).toDateString()===d,gn=n&&n.me===m.me&&n.ts-m.ts<18e4&&new Date(n.ts).toDateString()===d,st=m.me?(m.st??1):0,sT=mode==="all"||(mode==="group"&&!gn);
 h+=`<div class="b ${m.me?"out":"in"}${gp?" gp":""}${gn?" gn":""}${st===-1?" bad":""}" data-a="mm" data-v="${E(m.id)}">${m.q?`<div class="q">${E(m.q)}</div>`:""}<span class="tx">${E(m.t)}</span><span class="mt">${st===-1?(m.perm?"Not sent ":"Retrying "):""}${m.exp?"⏱ ":""}${sT?fmt(m.ts):""}${m.me?tick(st):""}</span>${m.r?`<em>${m.r}</em>`:""}</div>`});
 el.innerHTML=h;el.scrollTop=el.scrollHeight}
@@ -170,6 +187,12 @@ tab(v){tab=v;render()},
 open(v){cur=v;view="chat";chat().unread=0;save();render();markRead(chat());keyCheck(chat())},
 back(){view="list";cur=null;render()},
 send,
+call(v){Call.start(chat(),v)},
+callend(){Call.end("Call ended")},
+callmute(){Call.toggleMute()},
+callcam(){Call.toggleCam()},
+callaccept(){Call.accept()},
+calldecline(){Call.decline()},
 lock(){locked=true;pin="";render()},
 key(v){if(Date.now()<until)return msg("Too many attempts. Wait 30 seconds.");
 if(v==="x")pin=pin.slice(0,-1);else if(pin.length<4)pin+=v;
@@ -201,7 +224,7 @@ document.addEventListener("input",e=>{if(e.target.id==="sq"){q=e.target.value;$(
 document.addEventListener("keydown",e=>{if(e.key==="Enter"&&e.target.id==="inp")send();if(e.key==="Enter"&&["au","ap","ap2"].includes(e.target.id))A.authgo()});
 document.addEventListener("visibilitychange",()=>{try{if(document.hidden){hid=Date.now();releaseWakeLock();if(C().screenSec)document.body.classList.add("priv")}else{document.body.classList.remove("priv");document.title="Quantum Signal";try{if("clearAppBadge" in navigator)navigator.clearAppBadge().catch(()=>{})}catch(e){}acquireWakeLock();if(!locked&&C().pin&&(Date.now()-hid)/1000>=C().autolock){locked=true;pin="";render()}else if(!locked){restartPoll();poll()}}}catch(e){logErr("visibility",e.message||e)}});
 setInterval(()=>{const n=Date.now();let ch=0;if(!locked&&C().pin&&C().idle&&n-lastAct>C().idle*6e4){locked=true;pin="";render()}S.chats.forEach(c=>{const k=c.msgs.length;c.msgs=c.msgs.filter(m=>(!m.exp||m.exp>n)&&(!C().keep||n-m.ts<C().keep*864e5));if(c.msgs.length!==k)ch=1});if(ch&&!locked){save();view==="chat"?renderMsgs():render()}},1000);
-const VER="0.8.2";
+const VER="0.8.3";
 const SK={signal:{n:"Signal",acc:"#3a76f0",rad:18,wall:"",f:""},ios:{n:"iOS",acc:"#0a84ff",rad:20,wall:"",f:"-apple-system,BlinkMacSystemFont,'SF Pro Text',system-ui,sans-serif"},midnight:{n:"Midnight (OLED)",acc:"#8b5cf6",rad:16,wall:"#000",f:"",dark:1},aurora:{n:"Aurora",acc:"#14b8a6",rad:22,wall:"linear-gradient(160deg,#0f2027,#203a43,#2c5364)",f:"",dark:1},sunset:{n:"Sunset",acc:"#f97316",rad:20,wall:"linear-gradient(160deg,#fff1e6,#ffe0f0)",f:"",light:1}};
 /* End-to-end encryption: ECDH P-256 key agreement + AES-GCM. Server only ever sees ciphertext. */
 const Net={
@@ -248,6 +271,7 @@ if(!c){try{c={id:e.from,name:e.from,msgs:[],dis:C().disap,ver:false,unread:0,pub
 let p;try{const raw=await Net.dec(c.pub,e);try{p=JSON.parse(raw)}catch(x){}if(!p||!p.k)p={k:"m",id:uid(),t:raw}}catch(x){bad++;const n=(badIds.get(e.id)||0)+1;badIds.set(e.id,n);if(n>=3)done(e.id);continue}
 if(p.k==="m"){if(!c.msgs.some(x=>x.id===p.id)){c.msgs.push({id:p.id,me:0,t:String(p.t),q:p.q||null,ts:e.ts,r:null,exp:c.dis?Date.now()+c.dis*1000:0});if(!(view==="chat"&&cur===c.id&&!document.hidden)){c.unread++;notifyNew(c.name,String(p.t),c.id)}}(dl[c.id]=dl[c.id]||{c,ids:[]}).ids.push(p.id)}
 else if(p.k==="d"||p.k==="r"){(p.ids||[]).forEach(id=>{const m=c.msgs.find(x=>x.id===id&&x.me);if(m)m.st=Math.max(m.st??1,p.k==="d"?2:3)})}
+else if(p.k==="co"||p.k==="ca"||p.k==="ci"||p.k==="ce"||p.k==="cd"){Call.onPacket(c,p)}
 else if(p.k==="x"){const m=c.msgs.find(x=>x.id===p.id);if(m)m.r=p.r||null}done(e.id)}
 if(d.m.length){save();if(!locked){if(view==="chat")renderMsgs();else if(tab==="chats"&&document.activeElement.id!=="sq")render()}}
 if(bad)toast(bad+" message"+(bad>1?"s":"")+" couldn’t be decrypted");
@@ -341,6 +365,80 @@ addEventListener("unhandledrejection",e=>logErr("promise",e.reason));
 ["pointerdown","keydown","touchstart"].forEach(t=>addEventListener(t,()=>{lastAct=Date.now();acquireWakeLock()},{passive:true}));
 async function keyCheck(c){if(!c||!c.pub||!C().keyAlert||!C().server)return;try{const p=await Net.find(c.id);if(p.x!==c.pub.x||p.y!==c.pub.y)sheet("Safety number changed",[["Trust new key",()=>{c.pub=p;c.ver=false;save();render()}],["Keep old key",()=>{}]],`<p class="hint">${E(c.name)}’s encryption key is different from before. This happens when they reinstall the app, or if someone is intercepting your chat. Check their safety number before trusting it.</p>`)}catch(e){}}
 const DEF={autolock:30,disap:0,theme:"system",font:16,bshape:"signal",inc:"plain",ts:"group",idle:0,keep:0};
+/* Voice and video calls. Signalling (offer/answer/ICE) travels inside the same
+   end-to-end encrypted message channel as text, so the server only ever sees
+   ciphertext. Media is encrypted by WebRTC's DTLS-SRTP with fresh ephemeral
+   keys for every call. A short call code, derived from both usernames, is shown
+   on both phones so you can confirm you are really talking to each other.
+   STUN helps the two phones connect directly; there is no TURN relay, so a
+   call between two strict NATs may fail to connect. */
+const Call={pc:null,stream:null,remote:null,id:null,peer:null,kind:null,dir:null,offer:null,state:"idle",t0:0,timer:null,ringT:null,ringI:null,muted:false,camOff:false,
+code(c){let h=H([C().user,c.id].sort().join("|")+"qs-call");return String(h%1000000).padStart(6,"0")},
+fmt(ms){const s=Math.floor(ms/1000);return Math.floor(s/60)+":"+String(s%60).padStart(2,"0")},
+tick(){clearInterval(Call.timer);Call.timer=setInterval(()=>{const e=document.getElementById("ctm");if(e&&Call.state==="live")e.textContent=Call.fmt(Date.now()-Call.t0)},1000)},
+beep(){try{Call.ac=Call.ac||new (window.AudioContext||window.webkitAudioContext)();const o=Call.ac.createOscillator(),g=Call.ac.createGain();o.frequency.value=880;g.gain.value=0.06;o.connect(g);g.connect(Call.ac.destination);o.start();setTimeout(()=>o.stop(),400)}catch(e){}},
+ring(on){Call.stopRing();if(!on)return;Call.beep();try{navigator.vibrate&&navigator.vibrate([300,200,300])}catch(e){}Call.ringI=setInterval(()=>{Call.beep();try{navigator.vibrate&&navigator.vibrate([300,200,300])}catch(e){}},2000)},
+stopRing(){clearInterval(Call.ringI);Call.ringI=null},
+clearRing(){clearTimeout(Call.ringT);Call.ringT=null;Call.stopRing()},
+async start(c,kind){if(Call.state!=="idle")return toast("Already in a call");if(!c.pub)return toast("No encryption key for this chat yet");if(!navigator.mediaDevices||!navigator.mediaDevices.getUserMedia)return toast("Calls need a browser or app with camera and microphone support");
+ let stream;try{stream=await navigator.mediaDevices.getUserMedia(kind==="video"?{audio:true,video:{width:{ideal:1280},height:{ideal:720}}}:{audio:true})}catch(e){logErr("call-media",e.message||e.name||e);return toast(/NotAllowed|denied|Permission/i.test((e.name||"")+" "+(e.message||""))?"Camera/microphone permission denied. Allow it in your phone’s Settings, or use the web version.":"Couldn’t open the camera/microphone: "+(e.message||e.name))}
+ const id=uid();Call.id=id;Call.peer=c;Call.kind=kind;Call.dir="out";Call.state="calling";Call.stream=stream;Call.t0=Date.now();Call.muted=false;Call.camOff=false;
+ const pc=Call.pc=new RTCPeerConnection({iceServers:[{urls:"stun:stun.l.google.com:19302"},{urls:"stun:stun1.l.google.com:19302"}]});
+ stream.getTracks().forEach(t=>pc.addTrack(t,stream));
+ pc.onicecandidate=e=>{if(e.candidate)tx(c,{k:"ci",id,cand:e.candidate}).catch(()=>{})};
+ pc.ontrack=e=>{Call.remote=e.streams[0];Call.show()};
+ pc.onconnectionstatechange=()=>{if(pc.connectionState==="connected"){Call.state="live";Call.clearRing();Call.show();Call.tick()}else if(pc.connectionState==="failed"){Call.end("Connection failed")}};
+ try{const offer=await pc.createOffer();await pc.setLocalDescription(offer);await tx(c,{k:"co",id,kind,sdp:pc.localDescription})}catch(e){Call.end("Couldn’t start the call");return}
+ Call.show();Call.ringT=setTimeout(()=>{if(Call.state==="calling")Call.end("No answer")},30000)},
+async onPacket(c,p){
+ if(p.k==="co"){if(Call.state!=="idle"){tx(c,{k:"cd",id:p.id}).catch(()=>{});return}
+  Call.id=p.id;Call.peer=c;Call.kind=p.kind||"voice";Call.dir="in";Call.state="ringing";Call.t0=Date.now();Call.offer=p.sdp;Call.muted=false;Call.camOff=false;
+  try{if(C().notif)notifyNew(c.name,"Incoming "+(Call.kind==="video"?"video":"voice")+" call",c.id)}catch(e){}
+  Call.show();Call.ring(true);
+  Call.ringT=setTimeout(()=>{if(Call.state==="ringing"){tx(c,{k:"ce",id:Call.id}).catch(()=>{});Call.end("Missed call",true)}},30000);return}
+ if(Call.id!==p.id)return;
+ if(p.k==="cd"){Call.end(Call.state==="calling"?"Declined":"Call ended");return}
+ if(p.k==="ce"){Call.end(Call.state==="calling"?"No answer":"Call ended");return}
+ if(!Call.pc)return;
+ if(p.k==="ca"){try{await Call.pc.setRemoteDescription(new RTCSessionDescription(p.sdp));Call.state="live";Call.clearRing();Call.show();Call.tick()}catch(e){Call.end("Connection failed")}return}
+ if(p.k==="ci"){try{await Call.pc.addIceCandidate(new RTCIceCandidate(p.cand))}catch(e){}return}},
+async accept(){if(Call.state!=="ringing")return;const c=Call.peer;Call.stopRing();
+ let stream;try{stream=await navigator.mediaDevices.getUserMedia(Call.kind==="video"?{audio:true,video:{width:{ideal:1280},height:{ideal:720}}}:{audio:true})}catch(e){logErr("call-media",e.message||e.name||e);Call.end("Couldn’t open the camera/microphone");return}
+ Call.stream=stream;const pc=Call.pc=new RTCPeerConnection({iceServers:[{urls:"stun:stun.l.google.com:19302"},{urls:"stun:stun1.l.google.com:19302"}]});
+ stream.getTracks().forEach(t=>pc.addTrack(t,stream));
+ pc.onicecandidate=e=>{if(e.candidate)tx(c,{k:"ci",id:Call.id,cand:e.candidate}).catch(()=>{})};
+ pc.ontrack=e=>{Call.remote=e.streams[0];Call.show()};
+ pc.onconnectionstatechange=()=>{if(pc.connectionState==="connected"){Call.state="live";Call.show();Call.tick()}else if(pc.connectionState==="failed")Call.end("Connection failed")};
+ try{await pc.setRemoteDescription(new RTCSessionDescription(Call.offer));const ans=await pc.createAnswer();await pc.setLocalDescription(ans);await tx(c,{k:"ca",id:Call.id,sdp:pc.localDescription});Call.state="live";Call.show();Call.tick()}catch(e){Call.end("Connection failed")}},
+decline(){if(Call.state!=="ringing")return;const c=Call.peer,id=Call.id;Call.clearRing();tx(c,{k:"cd",id}).catch(()=>{});Call.end("Declined",true)},
+toggleMute(){if(!Call.stream)return;Call.muted=!Call.muted;Call.stream.getAudioTracks().forEach(t=>t.enabled=!Call.muted);Call.show()},
+toggleCam(){if(!Call.stream)return;Call.camOff=!Call.camOff;Call.stream.getVideoTracks().forEach(t=>t.enabled=!Call.camOff);Call.show()},
+show(){const c=Call.peer;if(!c)return;let el=document.getElementById("call");if(!el){el=document.createElement("div");el.id="call";el.className="call";document.body.append(el)}
+ const isV=Call.kind==="video",live=Call.state==="live",ringing=Call.state==="ringing",calling=Call.state==="calling";
+ const code=Call.code(c),cc=code.slice(0,3)+" "+code.slice(3);
+ const stTxt=calling?"Calling…":ringing?"Incoming "+(isV?"video":"voice")+" call":live?"Connected":"";
+ const topBar=`<div class="ctop"><b>${E(c.name)}</b><div>${stTxt}</div><div id="ctm">${live?Call.fmt(Date.now()-Call.t0):""}</div></div>`;
+ const avatar=`<div class="who2"><div class="av2">${E(c.name.slice(0,1).toUpperCase())}</div><h2>${E(c.name)}</h2><div>${stTxt}</div><div id="ctm">${live?Call.fmt(Date.now()-Call.t0):""}</div></div>`;
+ el.innerHTML=(isV&&live&&Call.remote?`<video id="rv" class="rv" autoplay playsinline></video>`:"")+(isV&&Call.stream?`<video id="lv" class="lv" autoplay playsinline muted style="${Call.camOff?"opacity:.25":""}"></video>`:"")+(isV&&live&&Call.remote?topBar:avatar)+(ringing?`<div class="ctrl"><button class="cb end" data-a="calldecline" aria-label="Decline">${ic("end",26)}</button><button class="cb" style="background:#2f9e44;width:64px;height:64px" data-a="callaccept" aria-label="Accept">${ic("phone",26)}</button></div>`:`<div class="ctrl">${isV?`<button class="cb ${Call.camOff?"off":""}" data-a="callcam" aria-label="Camera">${ic(Call.camOff?"camoff":"video",24)}</button>`:""}<button class="cb ${Call.muted?"off":""}" data-a="callmute" aria-label="Mute">${ic(Call.muted?"micoff":"mic",24)}</button><button class="cb end" data-a="callend" aria-label="End call">${ic("end",26)}</button></div>`)+`<div class="code">Call code ${cc} · compare with ${E(c.name)} to confirm it’s really them</div>`+(isV?"":`<audio id="ra" autoplay></audio>`);
+ const rv=el.querySelector("#rv");if(rv&&Call.remote)rv.srcObject=Call.remote;
+ const lv=el.querySelector("#lv");if(lv&&Call.stream)lv.srcObject=Call.stream;
+ const ra=el.querySelector("#ra");if(ra&&Call.remote)ra.srcObject=Call.remote;
+ if(live)acquireWakeLock()},
+end(reason,silent){const prev=Call.state,kind=Call.kind||"voice",dir=Call.dir,c=Call.peer,id=Call.id,dur=prev==="live"&&Call.t0?Date.now()-Call.t0:0;
+ if(prev!=="idle"&&id&&c&&!silent)tx(c,{k:"ce",id}).catch(()=>{});
+ Call.clearRing();Call.stopRing();
+ try{if(Call.pc)Call.pc.close()}catch(e){}try{if(Call.stream)Call.stream.getTracks().forEach(t=>t.stop())}catch(e){}
+ Call.pc=null;Call.stream=null;Call.remote=null;Call.id=null;Call.peer=null;Call.offer=null;Call.state="idle";Call.t0=0;Call.muted=false;Call.camOff=false;clearInterval(Call.timer);Call.timer=null;
+ const el=document.getElementById("call");if(el)el.remove();
+ if(c&&reason){let label;
+  if(prev==="live")label="📞 "+kind+" call · "+Call.fmt(dur);
+  else if(prev==="ringing")label=reason==="Declined"?"📞 Call declined":reason==="Connection failed"?"📞 Call failed":"📞 Missed "+kind+" call";
+  else if(prev==="calling")label=reason==="No answer"?"📞 No answer":reason==="Declined"?"📞 Call declined":reason==="Connection failed"?"📞 Call failed":reason==="Couldn’t start the call"?"📞 Call failed":"📞 Call cancelled";
+  else label=null;
+  if(label){c.msgs.push({id:uid(),me:dir==="out"?1:0,t:label,ts:Date.now(),r:null,call:1});save();if(view==="chat"&&cur===c.id)renderMsgs();else if(view==="list")render()}
+  if(reason&&reason!=="Call ended")toast(reason)}
+ else if(reason&&reason!=="Call ended")toast(reason)}
+};
 async function secCheck(){toast("Checking security…");const c=C(),L=[];const add=(k,n,d="")=>L.push({k,n,d});
 isSecureContext&&window.crypto&&crypto.subtle?add("ok","Encryption available","ECDH P-256 + AES-GCM, keys never leave this phone"):add("bad","Encryption unavailable","This page isn’t secure. It needs HTTPS or the installed app.");
 c.token?add("ok","Logged in as @"+c.user):add("warn","Not logged in","Log in or create an account on the first screen.");

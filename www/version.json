@@ -1,1 +1,1 @@
-{"version": "0.8.2", "notes": "V8.2: security checkup, stronger passwords (12+), 30-day sessions, log out other devices, screenshot blocking", "server": "https://quantum-signal.qs-066647a2.workers.dev", "servers": ["https://quantum-signal.qs-066647a2.workers.dev"]}
+{"version": "0.8.3", "notes": "V8.3: encrypted voice and video calls (WebRTC, E2E signalling, call code, call history)", "server": "https://quantum-signal.qs-066647a2.workers.dev", "servers": ["https://quantum-signal.qs-066647a2.workers.dev"]}
