@@ -299,9 +299,10 @@ panic(){sheet("Wipe all data?",[["Yes, wipe everything now",wipe]],'<p class="hi
 document.addEventListener("click",e=>{const el=e.target.closest("[data-a]");if(el&&A[el.dataset.a])A[el.dataset.a](el.dataset.v)});
 document.addEventListener("input",e=>{if(e.target.id==="sq"){q=e.target.value;$("#cl").innerHTML=rows()}});
 document.addEventListener("keydown",e=>{if(e.key==="Enter"&&e.target.id==="inp")send();if(e.key==="Enter"&&["au","ap","ap2"].includes(e.target.id))A.authgo()});
-document.addEventListener("visibilitychange",()=>{try{if(document.hidden){hid=Date.now();releaseWakeLock();dlog("vis","app hidden — starting background service");fgStart();if(Backup.dirty)Backup.upload(true);if(C().screenSec)document.body.classList.add("priv")}else{document.body.classList.remove("priv");document.title="Quantum Signal";try{if("clearAppBadge" in navigator)navigator.clearAppBadge().catch(()=>{})}catch(e){}acquireWakeLock();fgStop();dlog("vis","app visible");if(!locked&&C().pin&&(Date.now()-hid)/1000>=C().autolock){locked=true;pin="";render()}else if(!locked){restartPoll();poll()}}}catch(e){logErr("visibility",e.message||e)}});
+document.addEventListener("visibilitychange",()=>{try{if(document.hidden){hid=Date.now();releaseWakeLock();dlog("vis","app hidden — starting background service");fgStart();if(Backup.dirty)Backup.upload(true);if(C().screenSec)document.body.classList.add("priv")}else{document.body.classList.remove("priv");document.title="Quantum Signal";try{if("clearAppBadge" in navigator)navigator.clearAppBadge().catch(()=>{})}catch(e){}acquireWakeLock();fgStop();dlog("vis","app visible");chkUp();if(!locked&&C().pin&&(Date.now()-hid)/1000>=C().autolock){locked=true;pin="";render()}else if(!locked){restartPoll();poll()}}}catch(e){logErr("visibility",e.message||e)}});
 setInterval(()=>{const n=Date.now();let ch=0;if(!locked&&C().pin&&C().idle&&n-lastAct>C().idle*6e4){locked=true;pin="";render()}S.chats.forEach(c=>{const k=c.msgs.length;c.msgs=c.msgs.filter(m=>(!m.exp||m.exp>n)&&(!C().keep||n-m.ts<C().keep*864e5));if(c.msgs.length!==k)ch=1});if(ch&&!locked){save();view==="chat"?renderMsgs():render()}},1000);
-const VER="0.8.6";
+const VER="0.8.7";
+const APK_URL="https://github.com/torreskodi02-gif/quantum-signal/releases/download/latest/quantum-signal.apk";
 const SK={signal:{n:"Signal",acc:"#3a76f0",rad:18,wall:"",f:""},ios:{n:"iOS",acc:"#0a84ff",rad:20,wall:"",f:"-apple-system,BlinkMacSystemFont,'SF Pro Text',system-ui,sans-serif"},midnight:{n:"Midnight (OLED)",acc:"#8b5cf6",rad:16,wall:"#000",f:"",dark:1},aurora:{n:"Aurora",acc:"#14b8a6",rad:22,wall:"linear-gradient(160deg,#0f2027,#203a43,#2c5364)",f:"",dark:1},sunset:{n:"Sunset",acc:"#f97316",rad:20,wall:"linear-gradient(160deg,#fff1e6,#ffe0f0)",f:"",light:1}};
 /* End-to-end encryption: ECDH P-256 key agreement + AES-GCM. Server only ever sees ciphertext. */
 const Net={
@@ -662,7 +663,7 @@ c.server?(/^https:/.test(c.server)?add("ok","Server uses HTTPS",host(c.server)):
 c.disap>0?add("ok","Disappearing messages on by default","New chats delete after "+DL[c.disap]):add("ok","Disappearing messages off by default","Turn them on per chat or in Settings");
 c.keyAlert?add("ok","Contact key change alerts on"):add("warn","Contact key change alerts are off","Turn them on in Settings → Advanced security");
 c.hidePrev?add("ok","Message previews hidden in the chat list"):add("ok","Message previews shown in the chat list","Hide them in Settings → Advanced security");
-UP.s==="avail"?add("warn","Update available","v"+UP.v+". Tap Update now at the top of Settings."):add("ok","App is up to date","v"+VER);
+UP.apk?add("warn","App update available","v"+UP.apkV+". Tap Update app at the top of Settings."):UP.s==="avail"?add("warn","Update available","v"+UP.v+". Tap Update now at the top of Settings."):add("ok","App is up to date","v"+VER);
 c.notif?add("ok","Message notifications on"):add("warn","Message notifications are off","You won’t be told about new messages");
 const nb=L.filter(x=>x.k==="bad").length,nw=L.filter(x=>x.k==="warn").length;
 const txt="Quantum Signal v"+VER+" security checkup\n"+L.map(x=>(x.k==="ok"?"[ok] ":x.k==="warn"?"[!] ":"[x] ")+x.n+(x.d?" - "+x.d:"")).join("\n");
@@ -700,7 +701,7 @@ try{const h=await Net.j("/health");up=true;add("ok","Server reachable",h.users+"
 if(up&&cfg.token){try{const p=await Net.find(cfg.user);cfg.pub&&p.x===cfg.pub.x&&p.y===cfg.pub.y?add("ok","Your account is registered","@"+cfg.user):(add("bad","Account keys don’t match the server","Someone may have taken @"+cfg.user+", or the server was reset."),reset=1)}catch(e){e.message==="not found"?(add("bad","Your username isn’t on this server","The server data was reset."),reset=1):add("warn","Couldn’t verify your account",Net.msg(e))}}
 else if(up)add("warn","Not logged in","Log in or create an account on the first screen.")}
 if(srvList().length>1){await probe();const n=srvList().length,u=srvList().filter(x=>SV[x]&&SV[x].up).length;add(u===n?"ok":u?"warn":"bad","Servers online: "+u+" of "+n,u===n?"Messages switch automatically if one goes down.":"Down: "+srvList().filter(x=>!(SV[x]&&SV[x].up)).map(x=>x.replace(/^https?:\/\//,"")).join(", "))}
-UP.s==="avail"?add("warn","Update available","v"+UP.v+". Tap Update now at the top of Settings."):UP.s==="error"?add("warn","Couldn’t check for updates"):add("ok","App is up to date");
+UP.apk?add("warn","App update available","v"+UP.apkV+". Tap Update app at the top of Settings."):UP.s==="avail"?add("warn","Update available","v"+UP.v+". Tap Update now at the top of Settings."):UP.s==="error"?add("warn","Couldn’t check for updates"):add("ok","App is up to date");
 ERR.length?add("warn",ERR.length+" error"+(ERR.length>1?"s":"")+" logged this session",ERR.slice(-3).map(e=>e.w+": "+e.m).join(" · ")):add("ok","No errors logged");
 const LN=window.Capacitor&&Capacitor.Plugins&&Capacitor.Plugins.LocalNotifications,FGp=window.Capacitor&&Capacitor.Plugins&&Capacitor.Plugins.ForegroundService;
 if(!cfg.notif)add("warn","Message notifications are off","Turn them on in Settings → Privacy and security.");
@@ -726,16 +727,40 @@ skins(){sheet("Style",Object.entries(SK).map(([k,x])=>[x.n,()=>{C().skin=k;C().a
 async upd(s){try{const d=await(await fetch("version.json?"+Date.now(),{cache:"no-store"})).json();if(d.version===VER){if(!s)toast("You’re up to date (v"+VER+")");return}
 sheet("Update available · v"+d.version,[["Update now",async()=>{try{for(const k of await caches.keys())await caches.delete(k)}catch(e){}location.replace(location.pathname+"?v="+d.version)}]],`<p class="hint">${E(d.notes||"")}</p>`)}catch(e){if(!s)toast("In-app updates work in the hosted app")}}});
 const SRC=/\.github\.io$/.test(location.hostname)?"live":(location.hostname==="localhost"&&Bio.native()?"bundled":"other");
-let UP={s:"idle",v:"",notes:""};
+let UP={s:"idle",v:"",notes:"",apk:false,apkV:""};
 const rs=()=>{if(!locked&&view==="list"&&tab==="set")render()};
 const srcTxt=()=>SRC==="live"?"Live from GitHub":SRC==="bundled"?"Saved copy inside the app":"Preview";
-const upCard=()=>{const a=UP.s,warn=SRC==="bundled";return`<div class="upc ${warn?"avail":a}"><div><b>${warn?"This app can’t update from GitHub":a==="avail"?"New version "+E(UP.v)+" is ready":a==="checking"?"Checking GitHub…":a==="applying"?"Loading the new version…":a==="latest"?"Up to date · v"+VER:a==="error"?"Couldn’t reach GitHub":"Quantum Signal v"+VER}</b><small>${warn?"It runs a copy saved inside the app. Install the newest APK once. After that it loads live from GitHub.":(a==="avail"?E(UP.notes||"")+" ":"")+srcTxt()+" · v"+VER}</small></div><button data-a="updgo">${a==="avail"?"Reload":a==="checking"?"Checking…":a==="applying"?"Loading…":"Refresh"}</button></div>`};
+
+/* App update: read the installed APK's version (via @capacitor/app) and open
+   the newest APK in the system browser so Android downloads and installs it.
+   Android never lets an app install itself silently — the user always taps
+   Install once — but this makes it one tap from inside the app. */
+async function apkVer(){try{const P=window.Capacitor&&Capacitor.Plugins&&Capacitor.Plugins.App;if(!P)return null;const i=await P.getInfo();return i&&i.version?String(i.version):null}catch(e){return null}}
+async function openApk(){const B=window.Capacitor&&Capacitor.Plugins&&Capacitor.Plugins.Browser;if(B){try{await B.open({url:APK_URL});dlog("update","opened APK download in browser");return}catch(e){logErr("apk-open",e.message||e)}}window.open(APK_URL,"_blank")}
+async function checkApk(latest){
+  UP.apk=false;UP.apkV="";
+  if(!Bio.native()||!latest)return;
+  const av=await apkVer();
+  if(!av)return; // can't tell the installed version; the web update still works
+  if(newer(latest,av)){
+    UP.apk=true;UP.apkV=String(latest);
+    dlog("update","APK outdated: installed "+av+", latest "+latest);
+    if(!locked&&view==="list"&&S.apkAsked!==UP.apkV){S.apkAsked=UP.apkV;save();
+      sheet("A new version of Quantum Signal is ready",[["Download and install",()=>A.apkupd()],["Later",()=>{}]],'<p class="hint">Version '+E(UP.apkV)+' is ready. Downloading it opens your browser; tap the downloaded file, then Install. Your chats and account stay put.</p>')}
+  }
+}
+const upCard=()=>{const a=UP.s,warn=SRC==="bundled";
+if(UP.apk)return`<div class="upc avail"><div><b>New app version ${E(UP.apkV)} is ready</b><small>Download the newest APK and install it. Your chats and account stay put.</small></div><button data-a="apkupd">Update app</button></div>`;
+return`<div class="upc ${warn?"avail":a}"><div><b>${warn?"This app can’t update from GitHub":a==="avail"?"New version "+E(UP.v)+" is ready":a==="checking"?"Checking GitHub…":a==="applying"?"Loading the new version…":a==="latest"?"Up to date · v"+VER:a==="error"?"Couldn’t reach GitHub":"Quantum Signal v"+VER}</b><small>${warn?"It runs a copy saved inside the app. Install the newest APK once. After that it loads live from GitHub.":(a==="avail"?E(UP.notes||"")+" ":"")+srcTxt()+" · v"+VER}</small></div><button data-a="updgo">${a==="avail"?"Reload":a==="checking"?"Checking…":a==="applying"?"Loading…":"Refresh"}</button></div>`};
 async function chkUp(boot){if(UP.s==="checking"||UP.s==="applying")return;const was=UP.s;UP.s="checking";rs();
 try{const d=await(await fetch("version.json?"+Date.now(),{cache:"no-store"})).json();if(!d.version)throw 0;if(d.server&&!C().token&&C().server!==d.server){C().server=d.server;save()}if(Array.isArray(d.servers))mergeServers(d.servers);
-if(!newer(d.version,VER))UP.s="latest";else{UP={s:"avail",v:String(d.version),notes:d.notes||""};if(boot&&SRC==="live"&&locked&&S.autoTried!==UP.v){S.autoTried=UP.v;save();return applyUp()}if(was!=="avail")toast("New version "+UP.v+" is ready. Open Settings and tap Reload.")}}catch(e){UP.s="error"}rs();if(!locked&&view==="list"&&tab==="chats")render()}
+if(!newer(d.version,VER)){UP.s="latest";S.autoTried=null;save()}else{UP={s:"avail",v:String(d.version),notes:d.notes||"",apk:UP.apk,apkV:UP.apkV};const tried=S.autoTried,canRetry=!tried||tried.v!==UP.v||Date.now()-(tried.t||0)>600000;if(SRC==="live"&&(locked||document.hidden)&&canRetry){S.autoTried={v:UP.v,t:Date.now()};save();return applyUp()}if(was!=="avail")toast("New version "+UP.v+" is ready. Open Settings and tap Reload.")}
+await checkApk(d.version)}catch(e){UP.s="error"}rs();if(!locked&&view==="list"&&tab==="chats")render()}
 async function applyUp(){UP.s="applying";rs();toast("Downloading update…");try{for(const k of await caches.keys())await caches.delete(k)}catch(e){}location.replace(location.pathname+"?v="+UP.v+"&t="+Date.now())}
 A.updgo=()=>UP.s==="avail"?applyUp():chkUp();
+A.apkupd=async()=>{toast("Downloading the newest app — tap the downloaded file, then Install");await openApk()};
 A.upd=s=>chkUp(!!s);
 const t0=A.tab;A.tab=v=>{t0(v);if(v==="set")chkUp()};
 load();applyTheme();render();if(Bio.native()&&C().bio&&C().pin&&!C().twofa)setTimeout(A.bio,400);setTimeout(()=>A.upd(1),400);
+setInterval(()=>chkUp(false),15*60*1000);
 </script></body></html>
