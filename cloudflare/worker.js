@@ -39,7 +39,7 @@ export class Hub{
   async auth(u,t){
     const r=this.user(u);if(!r||typeof t!=='string'||!t)throw new HttpErr(401,'auth');
     const h=await hex(t);
-    if(!same(h,r.th)&&!this.run('SELECT 1 AS x FROM tokens WHERE user=? AND th=?',u,h).length)throw new HttpErr(401,'auth');
+    if(!same(h,r.th)){const row=this.run('SELECT at FROM tokens WHERE user=? AND th=?',u,h)[0];if(!row||Date.now()-row.at>30*864e5)throw new HttpErr(401,'auth');}
     return h;
   }
   failed(u){const f=this.fails.get(u)||{n:0,t:0};if(Date.now()-f.t>9e5)f.n=0;return f}
@@ -80,6 +80,7 @@ export class Hub{
         const tok=rand();
         this.run('INSERT INTO tokens(th,user,at) VALUES(?,?,?)',await hex(tok),u,Date.now());
         this.run('DELETE FROM tokens WHERE user=? AND th NOT IN (SELECT th FROM tokens WHERE user=? ORDER BY at DESC LIMIT 10)',u,u);
+        this.run('DELETE FROM tokens WHERE at<?',Date.now()-30*864e5);
         return reply({token:tok,pub:JSON.parse(r.pub),vault:JSON.parse(r.vault)});
       }
 
@@ -102,6 +103,13 @@ export class Hub{
         this.run('DELETE FROM tokens WHERE user=? AND th=?',u,h);
         if(same(h,r.th))this.run('UPDATE users SET th=? WHERE name=?',await hex(rand()),u);
         return reply({ok:true});
+      }
+
+      if(p==='/logout-all'&&req.method==='POST'){
+        const u=parse(raw).u,h=await this.auth(u,t);
+        const n=this.run('SELECT COUNT(*) AS c FROM tokens WHERE user=? AND th!=?',u,h)[0].c;
+        this.run('DELETE FROM tokens WHERE user=? AND th!=?',u,h);
+        return reply({ok:true,removed:n});
       }
 
       if(p.startsWith('/user/')){

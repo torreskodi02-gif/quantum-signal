@@ -1,1 +1,1 @@
-{"version": "0.8.1", "notes": "V8.1: message notifications, wake lock, resilient polling \u2014 messages update when you return to the app", "server": "https://quantum-signal.qs-066647a2.workers.dev", "servers": ["https://quantum-signal.qs-066647a2.workers.dev"]}
+{"version": "0.8.2", "notes": "V8.2: security checkup, stronger passwords (12+), 30-day sessions, log out other devices, screenshot blocking", "server": "https://quantum-signal.qs-066647a2.workers.dev", "servers": ["https://quantum-signal.qs-066647a2.workers.dev"]}
