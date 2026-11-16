@@ -41,21 +41,6 @@ object Vault {
     } catch (e: Exception) { null }
 }
 
-class Msg(val id: Long, val text: String, val st: Int)
-
-object Msgs {
-    private fun f(c: Context) = File(c.filesDir, "notes.dat")
-    fun load(c: Context): List<Msg> {
-        val x = f(c); if (!x.exists()) return emptyList()
-        return x.readLines().mapNotNull { l ->
-            try { val a = (Vault.dec(l) ?: "").split("|", limit = 3); Msg(a[0].toLong(), String(Base64.decode(a[2], Base64.NO_WRAP)), a[1].toInt()) } catch (e: Exception) { null }
-        }
-    }
-    fun save(c: Context, m: List<Msg>) {
-        f(c).writeText(m.joinToString("\n") { Vault.enc("${it.id}|${it.st}|" + Base64.encodeToString(it.text.toByteArray(), Base64.NO_WRAP)) })
-    }
-}
-
 object Dbg {
     private fun f(c: Context) = File(c.filesDir, "debug.log")
     fun log(c: Context, s: String, force: Boolean = false) {
