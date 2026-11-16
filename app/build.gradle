@@ -1,21 +1,69 @@
-plugins { id 'com.android.application'; id 'org.jetbrains.kotlin.android' }
-def vc = System.getenv('VC') ?: '1'
+// Quantum Signal (native) — app module build file.
+//
+// NOTE: the google-services plugin is DELIBERATELY NOT applied here.
+// That plugin REQUIRES google-services.json at build time, and Kodi has
+// not created the Firebase project yet. Applying it would break every
+// build until he does. Instead we depend only on the firebase-messaging
+// library: the app builds and runs fine without google-services.json,
+// and FCM simply stays inert (onNewToken never fires, no token is ever
+// registered) until Kodi adds the file — see the comment at the top of
+// Fcm.kt. When he does add it, no build change is needed: the library
+// picks the config up automatically.
+
+plugins {
+    id 'com.android.application'
+    id 'org.jetbrains.kotlin.android'
+}
+
 android {
     namespace 'app.quantumsignal'
     compileSdk 34
-    defaultConfig { applicationId 'app.quantumsignal'; minSdk 23; targetSdk 28; versionCode vc.toInteger(); versionName "0.$vc" }
+
+    defaultConfig {
+        applicationId 'app.quantumsignal'
+        minSdk 23
+        targetSdk 34
+        // versionCode comes from CI (VC = GitHub run number); 1 for local builds.
+        versionCode (System.getenv('VC') ?: '1').toInteger()
+        versionName '0.1.0'
+    }
+
+    // Release signing from the CI environment: KS_FILE = path to the
+    // keystore, KS_PASS = keystore + key password, alias "voltforge".
+    // The release build is only signed when both are present; without
+    // them (local dev builds) assembleRelease produces an unsigned APK.
+    def ksFile = System.getenv('KS_FILE')
+    def ksPass = System.getenv('KS_PASS')
     signingConfigs {
         release {
-            def f = System.getenv('KS_FILE')
-            if (f) {
-                storeFile file(f); storePassword System.getenv('KS_PASS')
-                keyAlias 'voltforge'; keyPassword System.getenv('KS_PASS')
-                enableV1Signing = true; enableV2Signing = true; enableV3Signing = true
+            if (ksFile && ksPass) {
+                storeFile file(ksFile)
+                storePassword ksPass
+                keyAlias 'voltforge'
+                keyPassword ksPass
             }
         }
     }
-    buildTypes { release { minifyEnabled false; signingConfig signingConfigs.release } }
-    compileOptions { sourceCompatibility JavaVersion.VERSION_17; targetCompatibility JavaVersion.VERSION_17 }
-    kotlinOptions { jvmTarget = '17' }
-    lint { abortOnError false; checkReleaseBuilds false }
+
+    buildTypes {
+        release {
+            minifyEnabled false
+            if (ksFile && ksPass) signingConfig signingConfigs.release
+        }
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+    kotlinOptions {
+        jvmTarget = '17'
+    }
+}
+
+dependencies {
+    // Firebase Cloud Messaging only. No other dependencies: the rest of
+    // the app uses Android framework APIs (org.json is built in) and the
+    // Kotlin stdlib that comes with the kotlin-android plugin.
+    implementation 'com.google.firebase:firebase-messaging:24.0.0'
 }

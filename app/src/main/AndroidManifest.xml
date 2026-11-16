@@ -5,8 +5,14 @@
     <uses-permission android:name="android.permission.WAKE_LOCK"/>
     <uses-permission android:name="android.permission.VIBRATE"/>
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE"/>
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_REMOTE_MESSAGING"/>
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED"/>
     <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES"/>
+    <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM"/>
+    <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS"/>
+    <uses-permission android:name="android.permission.CAMERA"/>
+    <uses-permission android:name="android.permission.RECORD_AUDIO"/>
+    <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS"/>
     <application android:label="Quantum Signal" android:allowBackup="false" android:usesCleartextTraffic="false" android:theme="@android:style/Theme.Material.NoActionBar">
         <activity android:name=".MainActivity" android:exported="true" android:windowSoftInputMode="adjustResize">
             <intent-filter>
@@ -15,5 +21,24 @@
             </intent-filter>
         </activity>
         <receiver android:name=".InstRcv" android:exported="false"/>
+        <!-- Foreground poller: keeps the long-poll alive while the app is
+             backgrounded so messages arrive without opening the app.
+             remoteMessaging type matches the FOREGROUND_SERVICE_REMOTE_MESSAGING
+             permission above (required on Android 14+). -->
+        <service android:name=".QsService" android:exported="false" android:foregroundServiceType="remoteMessaging" />
+        <!-- Firebase Cloud Messaging. Inert until google-services.json is
+             added; see the comment at the top of Fcm.kt. -->
+        <service android:name=".FcmService" android:exported="false">
+            <intent-filter>
+                <action android:name="com.google.firebase.MESSAGING_EVENT" />
+            </intent-filter>
+        </service>
+        <!-- Restart the poller after a reboot (only if logged in;
+             QsService.start / Poller.start check for an account). -->
+        <receiver android:name=".BootReceiver" android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
+            </intent-filter>
+        </receiver>
     </application>
 </manifest>
