@@ -51,6 +51,8 @@ class MainActivity : Activity() {
     internal var busy = false
     internal var scr = "home"
     internal var bgAt = 0L
+    internal var curChat: String? = null
+    internal var authBusy = false
     internal val accents = listOf("#3B30F0", "#FF6B57", "#4ADE80", "#F5A524", "#F472B6", "#A78BFA")
 
     internal fun c(s: String) = Color.parseColor(s)
@@ -109,16 +111,41 @@ class MainActivity : Activity() {
     override fun onCreate(s: Bundle?) {
         super.onCreate(s); Dbg.install(applicationContext); root = FrameLayout(this); setContentView(root); applySecure()
         root.filterTouchesWhenObscured = p.getBoolean("overlay", true); Dbg.log(this, "start " + Upd.name(this))
+        // Messenger state: load the account + chats, restart the poller if
+        // we are logged in, and re-register the stored FCM token.
+        Store.load(applicationContext)
+        if (Store.account() != null) {
+            Poller.start(applicationContext)
+            Fcm.storedToken(applicationContext)?.let { Fcm.onToken(applicationContext, it) }
+        }
+        // Notification tap: open that chat once unlocked.
+        intent.getStringExtra("chat")?.let { curChat = it; scr = "chat" }
     }
     override fun onResume() {
         super.onResume()
         val d = listOf(0, 7, 14, 30)[p.getInt("inact", 0).coerceIn(0, 3)]
         if (d > 0 && p.contains("h") && System.currentTimeMillis() - p.getLong("lastUnlock", System.currentTimeMillis()) > d * 86400000L) { wipe(); return }
         if (unlocked && p.getBoolean("lockbg", true) && System.currentTimeMillis() - bgAt >= listOf(0L, 30000L, 60000L, 300000L)[p.getInt("lockdelay", 0).coerceIn(0, 3)]) { unlocked = false; scr = "home" }
+        if (unlocked && Store.account() != null) {
+            Poller.setBackground(applicationContext, false)
+            Thread { if (Poller.pollOnce(applicationContext)) runOnUiThread { if (scr == "home") render() } }.start()
+        }
         render()
     }
-    override fun onStop() { super.onStop(); bgAt = System.currentTimeMillis() }
-    internal fun back() { scr = if (scr.startsWith("cat:") || scr in setOf("user", "center", "debug", "upd")) "settings" else "home"; render() }
+    override fun onStop() {
+        super.onStop(); bgAt = System.currentTimeMillis()
+        if (Store.account() != null) Poller.setBackground(applicationContext, true)
+    }
+    internal fun back() {
+        scr = when {
+            scr == "chat" || scr == "newchat" -> "home"
+            scr == "settings" -> "home"
+            scr == "auth" -> "auth"
+            scr.startsWith("cat:") || scr in setOf("user", "center", "debug", "upd", "account", "backup") -> "settings"
+            else -> "home"
+        }
+        render()
+    }
     override fun onBackPressed() { if (unlocked && scr != "home") back() else super.onBackPressed() }
 
     internal fun render() {
@@ -126,7 +153,7 @@ class MainActivity : Activity() {
         val w = wps[p.getInt("wp", 0).coerceIn(0, wps.size - 1)].second
         root.background = GradientDrawable(GradientDrawable.Orientation.TL_BR, if (w.size < 2) intArrayOf(c(t.bg), c(t.bg)) else w)
         root.removeAllViews()
-        if (!p.contains("h")) setup(t) else if (!unlocked) lock(t) else route(t)
+        if (!p.contains("h")) setup(t) else if (!unlocked) lock(t) else { if (Store.account() == null) scr = "auth"; route(t) }
     }
 
     internal fun center(t: Th, title: String, sub: String): LinearLayout {
@@ -173,28 +200,6 @@ class MainActivity : Activity() {
                 else { if (p.getBoolean("lockout", true) && n >= 3) p.edit().putLong("until", now + minOf(300L, 5L shl minOf(n - 3, 6)) * 1000L).apply(); m.text = "Wrong PIN ($n)" }
             }
         }, lp(12))
-    }
-
-    internal fun home(t: Th) {
-        val col = LinearLayout(this); col.orientation = LinearLayout.VERTICAL
-        root.addView(col, FrameLayout.LayoutParams(-1, -1))
-        val un = Vault.dec(p.getString("user", "") ?: "") ?: ""
-        val top = LinearLayout(this); top.gravity = Gravity.CENTER_VERTICAL; top.setPadding(dp(16), dp(38), dp(12), dp(6))
-        val av = avatar(t, if (un.isEmpty()) "Q" else un, 40); av.setOnClickListener { scr = "settings"; render() }
-        top.addView(av)
-        val ti = tv("Quantum Signal", 22f, t.tx, true); ti.setPadding(dp(12), 0, 0, 0); top.addView(ti, LinearLayout.LayoutParams(0, -2, 1f))
-        top.addView(btn("✎", t.card, t.tx) { scr = "chat"; render() }); top.addView(btn("⚙", t.card, t.tx) { scr = "settings"; render() })
-        col.addView(top)
-        val box = LinearLayout(this); box.orientation = LinearLayout.VERTICAL; box.setPadding(dp(16), dp(4), dp(16), dp(16))
-        val sv = ScrollView(this); sv.addView(box); col.addView(sv, LinearLayout.LayoutParams(-1, 0, 1f))
-        if (p.getBoolean("warnInt", true)) {
-            val bad = Chk.run(this, p).count { !it.second }
-            if (bad > 0) box.addView(nav(t, "$bad security items to review", "Tap to open the Security Center") { scr = "center"; render() }, lp(0))
-        }
-        val last = Msgs.load(this).lastOrNull()
-        box.addView(chatRow(t, "Note to Self", if (last == null) "Tap to write a note" else if (p.getBoolean("hidePrev", false)) "Message" else last.text,
-            if (last == null) "" else fmt(last.id), if (last == null || !p.getBoolean("ticks", true)) "" else tick(last.st).substringBefore(" ")) { scr = "chat"; render() }, lp(8))
-        box.addView(card(t, tv("Coming next", 14f, t.ac, true), tv("Accounts and email verification\nPost-quantum encrypted messaging\nVoice and video calls", 13f, t.tx)), lp(14))
     }
 
     internal fun wipe() {
