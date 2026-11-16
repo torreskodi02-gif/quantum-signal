@@ -126,11 +126,88 @@ const PK={autolock:{t:"Auto-lock",o:[[0,"Immediately"],[30,"After 30 seconds"],[
 const ACC=["#3a76f0","#6d4df2","#e0457b","#2fa36b","#e08a1e","#0e9fb5"];
 const fmt=t=>new Date(t).toLocaleTimeString([],{hour:"numeric",minute:"2-digit"});
 const fday=t=>new Date(t).toDateString()===new Date().toDateString()?fmt(t):new Date(t).toLocaleDateString([],{weekday:"short"});
-function seed(){return{mig:3,cfg:{server:CF,pin:null,bio:true,autolock:30,screenSec:true,receipts:true,notif:true,bg:true,permAsked:false,pushOn:false,incog:true,wipe10:false,theme:"system",acc:"#3a76f0",font:16,disap:0,cred:null,skin:"signal",bshape:"signal",bcol:"",inc:"plain",ts:"group"},chats:[{id:"Note to Self",name:"Note to Self",msgs:[],dis:0,ver:false,unread:0}]}}
+function seed(){return{mig:3,cfg:{server:CF,pin:null,bio:true,autolock:30,screenSec:true,receipts:true,notif:true,bg:true,permAsked:false,pushOn:false,backup:true,incog:true,wipe10:false,theme:"system",acc:"#3a76f0",font:16,disap:0,cred:null,skin:"signal",bshape:"signal",bcol:"",inc:"plain",ts:"group"},chats:[{id:"Note to Self",name:"Note to Self",msgs:[],dis:0,ver:false,unread:0}]}}
 let S,view="list",tab="chats",cur=null,q="",reply=null,locked=true,pin="",stage=0,first="",tries=0,until=0,hid=0;
 const C=()=>S.cfg,chat=()=>S.chats.find(c=>c.id===cur),last=c=>c.msgs.length?c.msgs[c.msgs.length-1].ts:0;
-function save(){try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){}}
-function load(){try{S=JSON.parse(localStorage.getItem(KEY))}catch(e){S=null}if(!S||!S.cfg)S=seed();S.cfg=Object.assign({bshape:"signal",bcol:"",inc:"plain",ts:"group",skin:"signal",notif:true,bg:true,permAsked:false,pushOn:false,twofa:false,idle:0,keyAlert:true,hidePrev:false,clipClear:false,keep:0,servers:[],autoSwitch:true},S.cfg);if(!S.cfg.server)S.cfg.server=CF;if(S.mig!==3){S.chats=S.chats.filter(c=>c.pub||c.id==="Note to Self");const n=S.chats.find(c=>c.id==="Note to Self");if(n&&n.msgs.length===1&&n.msgs[0].t.startsWith("Ideas:"))n.msgs=[];S.mig=3;save()}}
+let saveCount=0;
+function save(){saveCount++;try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){}try{Backup.mark()}catch(e){}}
+/* Cloud backup: your chats are encrypted on this phone with a key derived
+   from your password (salt "qs-backup:"), then stored as one opaque blob on
+   the server. The server can never read it. When you log in on a new phone
+   (or after deleting the app), the backup is downloaded, decrypted with
+   your password, and your chats come back. Nothing is backed up until you
+   have a password. If you change your password, the backup is re-uploaded
+   with the new key right away. */
+let BK=null; // backup AES-GCM key, in memory only, cleared on logout
+async function bkdf(u,pw){const k=await crypto.subtle.importKey("raw",enc(pw.normalize("NFKC")),"PBKDF2",false,["deriveBits"]);const bits=await crypto.subtle.deriveBits({name:"PBKDF2",hash:"SHA-256",salt:enc("qs-backup:"+u),iterations:6e5},k,256);return crypto.subtle.importKey("raw",bits,"AES-GCM",false,["encrypt","decrypt"])}
+const Backup={
+  lastOk:0,dirty:false,uploading:false,
+  ready(){return !!BK&&!!C().token&&!!C().hasPw&&C().backup!==false},
+  mark(){if(C().backup!==false)this.dirty=true},
+  snapshot(){return{v:1,ts:Date.now(),chats:S.chats}},
+  async upload(force){
+    if(!this.ready())return false;
+    if(this.uploading)return false;
+    if(!force&&Date.now()-this.lastOk<300000)return false;
+    this.uploading=true;
+    const c0=saveCount;
+    try{
+      const iv=crypto.getRandomValues(new Uint8Array(12));
+      const ct=b64e(await crypto.subtle.encrypt({name:"AES-GCM",iv},BK,enc(JSON.stringify(this.snapshot()))));
+      await Net.j("/backup",{method:"POST",body:JSON.stringify({u:C().user,iv:b64e(iv),data:ct})});
+      this.lastOk=Date.now();C().bkAt=this.lastOk;save();
+      this.dirty=saveCount!==c0+1;
+      dlog("backup","uploaded, "+ct.length+" chars");
+      return true;
+    }catch(e){
+      dlog("backup","upload failed: "+(e.message||e));
+      if(e.message==="not found")toast("Cloud backup needs a server update — run cloudflare.sh on your phone.");
+      else logErr("backup",e.message||e);
+      return false;
+    }finally{this.uploading=false}
+  },
+  async download(){
+    if(!this.ready())return null;
+    try{
+      const d=await Net.j("/backup?u="+encodeURIComponent(C().user));
+      if(!d||!d.data)return null;
+      let raw;
+      try{raw=new TextDecoder().decode(await crypto.subtle.decrypt({name:"AES-GCM",iv:b64d(d.iv)},BK,b64d(d.data)))}
+      catch(e){return{error:"badkey"}}
+      const b=JSON.parse(raw);
+      if(!b||b.v!==1||!Array.isArray(b.chats))return{error:"bad backup"};
+      dlog("backup","downloaded, "+b.chats.length+" chats");
+      return b;
+    }catch(e){
+      if(e.message==="not found")return null;
+      dlog("backup","download failed: "+(e.message||e));
+      return{error:e.message||e};
+    }
+  },
+  async restore(force){
+    const b=await this.download();
+    if(!b)return false;
+    if(b.error){toast(b.error==="badkey"?"This backup was made with a different password. Log in with the password you used when it was backed up.":"Couldn’t restore the backup: "+b.error);return false}
+    const hasLocal=S.chats.some(c=>c.id!=="Note to Self"&&c.msgs.length);
+    if(hasLocal&&!force)return false;
+    S.chats=b.chats;S.ack=[];save();this.dirty=false;if(view==="chat")renderMsgs();else render();
+    toast("Restored "+b.chats.length+" chats from your cloud backup");
+    dlog("backup","restored "+b.chats.length+" chats");
+    return true;
+  },
+  async afterLogin(u,pw){
+    try{BK=await bkdf(u,pw)}catch(e){BK=null;logErr("backup-key",e.message||e);return}
+    const hasLocal=S.chats.some(c=>c.id!=="Note to Self"&&c.msgs.length);
+    if(!hasLocal){const ok=await this.restore(false);if(ok)dlog("backup","auto-restored on login")}
+    else this.dirty=true;
+  },
+  async remove(){
+    if(!C().token)return;
+    try{await Net.j("/backup",{method:"DELETE",body:JSON.stringify({u:C().user})});C().bkAt=0;save();toast("Cloud backup deleted");dlog("backup","deleted from server")}catch(e){toast("Couldn’t delete the backup: "+Net.msg(e))}
+  }
+};
+
+function load(){try{S=JSON.parse(localStorage.getItem(KEY))}catch(e){S=null}if(!S||!S.cfg)S=seed();S.cfg=Object.assign({bshape:"signal",bcol:"",inc:"plain",ts:"group",skin:"signal",notif:true,bg:true,permAsked:false,pushOn:false,backup:true,twofa:false,idle:0,keyAlert:true,hidePrev:false,clipClear:false,keep:0,servers:[],autoSwitch:true},S.cfg);if(!S.cfg.server)S.cfg.server=CF;if(S.mig!==3){S.chats=S.chats.filter(c=>c.pub||c.id==="Note to Self");const n=S.chats.find(c=>c.id==="Note to Self");if(n&&n.msgs.length===1&&n.msgs[0].t.startsWith("Ideas:"))n.msgs=[];S.mig=3;save()}}
 function applyTheme(){const r=document.documentElement;r.dataset.theme=C().theme==="system"?"":C().theme;r.style.setProperty("--acc",C().acc);r.style.setProperty("--fs",C().font+"px");const k=SK[C().skin]||SK.signal;r.style.setProperty("--rad",k.rad+"px");r.style.setProperty("--wall",k.wall||"var(--bg)");k.wall==="#000"?r.style.setProperty("--bg","#000"):r.style.removeProperty("--bg");document.body.style.fontFamily=k.f||"";r.style.setProperty("--bo",C().bcol||"var(--acc)");r.style.setProperty("--rad",({signal:18,soft:24,sharp:6})[C().bshape||"signal"]+"px");r.dataset.inc=C().inc||"plain"}
 function toast(t){const d=document.createElement("div");d.className="toast";d.textContent=t;document.body.append(d);setTimeout(()=>d.remove(),2400)}
 function sheet(t,items,html=""){const d=document.createElement("div");d.className="sh";d.innerHTML=`<div class="bx"><h4>${t}</h4>${html}${items.map((x,i)=>`<button data-i="${i}">${x[0]}</button>`).join("")}</div>`;d.onclick=e=>{const b=e.target.closest("button");if(b){d.remove();items[b.dataset.i][1]()}else if(e.target===d)d.remove()};document.body.append(d)}
@@ -168,7 +245,7 @@ return`<div class="pg">${upCard()}<div class="grp"><h3>Troubleshooting</h3>${act
 <div class="grp"><h3>Appearance</h3><div class="row" data-a="skins"><div><b>Style</b></div><small>${(SK[c.skin]||SK.signal).n}</small></div>${pk("theme","Theme")}${pk("font","Message size")}<div class="sw2">${ACC.map(a=>`<i data-a="acc" data-v="${a}" class="${c.acc===a?"on":""}" style="background:${a}"></i>`).join("")}</div></div>
 <div class="grp"><h3>Advanced security</h3>${tg("twofa","Fingerprint + PIN","Require both to unlock")}${pk("idle","Lock when idle")}${tg("keyAlert","Contact key change alerts","Warn if someone’s encryption key changes")}${tg("hidePrev","Hide message previews","Don’t show message text in the chat list")}${tg("clipClear","Clear clipboard after copying","Wipes copied text after 30 seconds")}${pk("keep","Delete old messages")}</div>
 <div class="grp"><h3>Chat bubbles</h3>${pk("bshape","Bubble shape")}${pk("inc","Incoming bubbles")}${pk("ts","Timestamps")}<div class="row" style="cursor:default"><div><b>Sent bubble colour</b></div></div><div class="sw2">${BC.map(x=>`<i data-a="bcol" data-v="${x}" class="${(c.bcol||"")===x?"on":""}" style="background:${x||c.acc}"></i>`).join("")}</div></div>
-<div class="grp"><h3>Network and updates</h3>${act("server","Server address",(c.server||"Not set")+(c.token&&online===false?" · offline":""))}${act("servers","Servers",srvSummary())}${c.server!==CF?act("usecf","Use Cloudflare for messages","Move your account to your Cloudflare server"):""}</div>
+<div class="grp"><h3>Network and updates</h3>${act("server","Server address",(c.server||"Not set")+(c.token&&online===false?" · offline":""))}${act("servers","Servers",srvSummary())}${c.server!==CF?act("usecf","Use Cloudflare for messages","Move your account to your Cloudflare server"):""}</div><div class="grp"><h3>Cloud backup</h3>${tg("backup","Cloud backup","Save your chats encrypted to the cloud so they come back when you log in again")}${act("bkupnow","Back up now",C().hasPw?(C().bkAt?("Last backup "+new Date(C().bkAt).toLocaleString()):"No backup yet"):"Add a password first to turn on cloud backup")}${act("bkrestore","Restore from backup","Download your cloud backup and restore your chats")}${act("bkdel","Delete cloud backup","Erase the backup from the server","dng")}</div>
 <div class="grp"><h3>Account</h3>${act("fp","Test fingerprint","Check that your fingerprint sensor works")}${act("pin","Change PIN","Set a new 4-digit PIN")}${act("lock","Lock now","Require PIN or fingerprint to reopen")}${act("pw",c.hasPw?"Change password":"Add a password",c.hasPw?"Update the password you log in with":"So you can log in on another phone")}${act("logout","Log out","Remove this account from this phone")}${act("logoutall","Log out of all other devices","End sessions on your other phones")}${act("resetnet","Reset server account","Remove your username and keys from this phone")}${act("panic","Panic wipe","Erase every chat, setting and PIN","dng")}</div><p class="hint">Quantum Signal v${VER}</p></div>`}
 function chatHTML(){const c=chat();return`<header class="ch"><button data-a="back" aria-label="Back">${ic("back")}</button><div class="who" data-a="info">${av(c.name,38)}<div><b>${E(c.name)}</b><small>${c.ver?"✓ Verified · ":""}${c.dis?"⏱ "+DL[c.dis]:"🔒 End-to-end encrypted"}</small></div></div><button data-a="call" data-v="voice" aria-label="Voice call">${ic("phone")}</button><button data-a="call" data-v="video" aria-label="Video call">${ic("video")}</button><button data-a="cmenu" aria-label="More">${ic("more")}</button></header><div id="msgs"></div><div id="rp"></div><div class="bar"><input id="inp" placeholder="Message" autocomplete="off" ${C().incog?'autocorrect="off" spellcheck="false" autocapitalize="sentences"':""}><button class="snd" data-a="send" aria-label="Send">${ic("send")}</button></div>`}
 function renderMsgs(){const el=$("#msgs");if(!el||view!=="chat")return;const M=chat().msgs,mode=C().ts||"group";let h="",pd="";
@@ -217,14 +294,14 @@ async fp(){toast(await Bio.auth()?"Fingerprint verified ✓":(Bio.err||"Fingerpr
 pin(){ask("Current PIN","Current PIN",v=>{if(v!==C().pin)return toast("Wrong PIN");C().pin=null;save();locked=true;pin="";stage=0;render()})},
 debug(){diag()},
 seccheck(){secCheck()},
-resetnet(){sheet("Reset server account?",[["Reset account",()=>{Object.assign(C(),{user:null,token:null,pub:null,priv:null});save();restartPoll();authWarned=false;render();toast("Account reset. Choose a username again.")}]],'<p class="hint">Removes your username and keys from this phone. Chats with other people stop working until you register again.</p>')},
+resetnet(){sheet("Reset server account?",[["Reset account",()=>{Object.assign(C(),{user:null,token:null,pub:null,priv:null});BK=null;save();restartPoll();authWarned=false;render();toast("Account reset. Choose a username again.")}]],'<p class="hint">Removes your username and keys from this phone. Chats with other people stop working until you register again.</p>')},
 panic(){sheet("Wipe all data?",[["Yes, wipe everything now",wipe]],'<p class="hint">Deletes every chat, setting and your PIN from this device.</p>')}};
 document.addEventListener("click",e=>{const el=e.target.closest("[data-a]");if(el&&A[el.dataset.a])A[el.dataset.a](el.dataset.v)});
 document.addEventListener("input",e=>{if(e.target.id==="sq"){q=e.target.value;$("#cl").innerHTML=rows()}});
 document.addEventListener("keydown",e=>{if(e.key==="Enter"&&e.target.id==="inp")send();if(e.key==="Enter"&&["au","ap","ap2"].includes(e.target.id))A.authgo()});
-document.addEventListener("visibilitychange",()=>{try{if(document.hidden){hid=Date.now();releaseWakeLock();dlog("vis","app hidden — starting background service");fgStart();if(C().screenSec)document.body.classList.add("priv")}else{document.body.classList.remove("priv");document.title="Quantum Signal";try{if("clearAppBadge" in navigator)navigator.clearAppBadge().catch(()=>{})}catch(e){}acquireWakeLock();fgStop();dlog("vis","app visible");if(!locked&&C().pin&&(Date.now()-hid)/1000>=C().autolock){locked=true;pin="";render()}else if(!locked){restartPoll();poll()}}}catch(e){logErr("visibility",e.message||e)}});
+document.addEventListener("visibilitychange",()=>{try{if(document.hidden){hid=Date.now();releaseWakeLock();dlog("vis","app hidden — starting background service");fgStart();if(Backup.dirty)Backup.upload(true);if(C().screenSec)document.body.classList.add("priv")}else{document.body.classList.remove("priv");document.title="Quantum Signal";try{if("clearAppBadge" in navigator)navigator.clearAppBadge().catch(()=>{})}catch(e){}acquireWakeLock();fgStop();dlog("vis","app visible");if(!locked&&C().pin&&(Date.now()-hid)/1000>=C().autolock){locked=true;pin="";render()}else if(!locked){restartPoll();poll()}}}catch(e){logErr("visibility",e.message||e)}});
 setInterval(()=>{const n=Date.now();let ch=0;if(!locked&&C().pin&&C().idle&&n-lastAct>C().idle*6e4){locked=true;pin="";render()}S.chats.forEach(c=>{const k=c.msgs.length;c.msgs=c.msgs.filter(m=>(!m.exp||m.exp>n)&&(!C().keep||n-m.ts<C().keep*864e5));if(c.msgs.length!==k)ch=1});if(ch&&!locked){save();view==="chat"?renderMsgs():render()}},1000);
-const VER="0.8.5";
+const VER="0.8.6";
 const SK={signal:{n:"Signal",acc:"#3a76f0",rad:18,wall:"",f:""},ios:{n:"iOS",acc:"#0a84ff",rad:20,wall:"",f:"-apple-system,BlinkMacSystemFont,'SF Pro Text',system-ui,sans-serif"},midnight:{n:"Midnight (OLED)",acc:"#8b5cf6",rad:16,wall:"#000",f:"",dark:1},aurora:{n:"Aurora",acc:"#14b8a6",rad:22,wall:"linear-gradient(160deg,#0f2027,#203a43,#2c5364)",f:"",dark:1},sunset:{n:"Sunset",acc:"#f97316",rad:20,wall:"linear-gradient(160deg,#fff1e6,#ffe0f0)",f:"",light:1}};
 /* End-to-end encryption: ECDH P-256 key agreement + AES-GCM. Server only ever sees ciphertext. */
 const Net={
@@ -290,6 +367,7 @@ for(const k in dl)tx(dl[k].c,{k:"d",ids:dl[k].ids}).catch(()=>{});
 if(view==="chat")markRead(chat())}catch(e){online=false;pollFails++;if(pollFails===1)toast("No connection. Will keep retrying.");if(!(e.name==="AbortError"&&pollCtl&&pollCtl.manual))logErr("poll",Net.msg(e));if(e.message==="auth"&&!authWarned){authWarned=true;toast("The server doesn’t recognise your account. Settings → Account → Reset server account.")}}}
 function retryFailed(){if(!C().token)return;S.chats.forEach(c=>c.pub&&c.msgs.forEach(m=>{if(m.me&&m.st===-1&&!m.perm&&(m.tries||0)<50&&Date.now()-(m.lt||0)>Math.min(2e3*2**(m.tries||0),6e4))relay(c,m)}));}
 setInterval(retryFailed,2000);
+setInterval(()=>{if(Backup.dirty)Backup.upload(false)},30000);
 let legacyInbox=false,pollCtl=null;
 function restartPoll(){if(pollCtl){pollCtl.manual=1;pollCtl.abort()}}
 function done(id){if(legacyInbox||!id)return;const a=S.ack||(S.ack=[]);if(!a.includes(id))a.push(id)}
@@ -341,8 +419,8 @@ async function unseal(v,key){return JSON.parse(new TextDecoder().decode(await cr
 const noteChat=()=>({id:"Note to Self",name:"Note to Self",msgs:[],dis:0,ver:false,unread:0});
 function adopt(o){if(C().user&&C().user!==o.user)S.chats=[noteChat()];Object.assign(C(),o);S.ack=[];save();restartPoll();discover()}
 Object.assign(Net,{
-async signup(u,pw){const k=await crypto.subtle.generateKey({name:"ECDH",namedCurve:"P-256"},true,["deriveKey"]),pub=await crypto.subtle.exportKey("jwk",k.publicKey),priv=await crypto.subtle.exportKey("jwk",k.privateKey),d0=await kdf(u,pw),d=await Net.j("/register",{method:"POST",body:JSON.stringify({u,pub,auth:d0.auth,vault:await seal(priv,d0.key)})});adopt({user:u,token:d.token,pub,priv,hasPw:true})},
-async login(u,pw){const d0=await kdf(u,pw),d=await Net.j("/login",{method:"POST",body:JSON.stringify({u,auth:d0.auth})});let priv;try{priv=await unseal(d.vault,d0.key)}catch(e){throw new Error("login")}if(priv.x!==d.pub.x||priv.y!==d.pub.y)throw new Error("login");adopt({user:u,token:d.token,pub:d.pub,priv,hasPw:true})}});
+async signup(u,pw){const k=await crypto.subtle.generateKey({name:"ECDH",namedCurve:"P-256"},true,["deriveKey"]),pub=await crypto.subtle.exportKey("jwk",k.publicKey),priv=await crypto.subtle.exportKey("jwk",k.privateKey),d0=await kdf(u,pw),d=await Net.j("/register",{method:"POST",body:JSON.stringify({u,pub,auth:d0.auth,vault:await seal(priv,d0.key)})});adopt({user:u,token:d.token,pub,priv,hasPw:true});Backup.afterLogin(u,pw)},
+async login(u,pw){const d0=await kdf(u,pw),d=await Net.j("/login",{method:"POST",body:JSON.stringify({u,auth:d0.auth})});let priv;try{priv=await unseal(d.vault,d0.key)}catch(e){throw new Error("login")}if(priv.x!==d.pub.x||priv.y!==d.pub.y)throw new Error("login");adopt({user:u,token:d.token,pub:d.pub,priv,hasPw:true});Backup.afterLogin(u,pw)}});
 let authTab="login",authUser="",authBusy=false;
 function authHTML(){const su=authTab==="signup";return`<div class="auth"><div class="logo">${ic("lock",34)}</div><h2>Quantum Signal</h2><p class="sub">Private messages, end-to-end encrypted</p>
 <div class="tabs"><button data-a="authtab" data-v="login" class="${su?"":"on"}">Log in</button><button data-a="authtab" data-v="signup" class="${su?"on":""}">Create account</button></div>
@@ -365,10 +443,10 @@ try{await(su?Net.signup(u,pw):Net.login(u,pw));authBusy=false;locked=!C().pin;vi
 catch(e){authBusy=false;logErr("auth",e);const m=authErr(e);render();const el=$("#aerr");if(el)el.textContent=m}},
 pw(){const has=!!C().hasPw;form(has?"Change password":"Add a password",has?["Current password","New password (8+ characters)","Confirm new password"]:["New password (8+ characters)","Confirm password"],async(...v)=>{const[old,n1,n2]=has?v:["",v[0],v[1]];
 if(n1.length<12)return toast("New password needs at least 12 characters");if(isCommonPw(n1))return toast("That password is too common. Pick a stronger one");if(n1!==n2)return toast("The new passwords don’t match");
-try{toast("Saving…");const u=C().user,n=await kdf(u,n1),body={u,auth:n.auth,vault:await seal(C().priv,n.key)};if(has)body.old=(await kdf(u,old)).auth;await Net.j("/password",{method:"POST",body:JSON.stringify(body)});C().hasPw=true;save();render();toast("Password saved")}
+try{toast("Saving…");const u=C().user,n=await kdf(u,n1),body={u,auth:n.auth,vault:await seal(C().priv,n.key)};if(has)body.old=(await kdf(u,old)).auth;await Net.j("/password",{method:"POST",body:JSON.stringify(body)});C().hasPw=true;save();render();toast("Password saved");bkdf(u,n1).then(k=>{BK=k;Backup.upload(true)}).catch(()=>{})}
 catch(e){toast(e.message==="login"?"Current password is wrong":e.message==="too many attempts"?"Too many attempts. Try again later":"Couldn’t save: "+Net.msg(e))}})},
 logout(){if(!C().hasPw)return toast("Add a password first, or you won’t be able to log back in");
-sheet("Log out?",[["Log out and erase this phone’s chats",async()=>{try{await Net.j("/logout",{method:"POST",body:JSON.stringify({u:C().user})})}catch(e){}Object.assign(C(),{user:null,token:null,pub:null,priv:null,hasPw:false});S.chats=[noteChat()];S.ack=[];save();restartPoll();locked=false;view="list";tab="chats";authTab="login";render()}]],'<p class="hint">Messages already delivered to this phone are erased. Log in again with your password to get your account back here or on another phone. Past messages can’t be restored.</p>')},
+sheet("Log out?",[["Log out and erase this phone’s chats",async()=>{try{await Net.j("/logout",{method:"POST",body:JSON.stringify({u:C().user})})}catch(e){}Object.assign(C(),{user:null,token:null,pub:null,priv:null,hasPw:false});BK=null;S.chats=[noteChat()];S.ack=[];save();restartPoll();locked=false;view="list";tab="chats";authTab="login";render()}]],'<p class="hint">Messages already delivered to this phone are erased. Log in again with your password to get your account back here or on another phone. Past messages can’t be restored.</p>')},
 logoutall(){sheet("Log out of all other devices?",[["Log out everywhere else",async()=>{try{const d=await Net.j("/logout-all",{method:"POST",body:JSON.stringify({u:C().user})});toast("Logged out of "+(d.removed||0)+" other session"+(d.removed===1?"":"s"))}catch(e){toast(e.message==="not found"?"The server needs updating first. Run cloudflare.sh on your phone, then try again":"Couldn’t log out: "+Net.msg(e))}}]],'<p class="hint">This phone stays logged in. Every other phone or browser using this account is signed out.</p>')}
 });
 /* Permissions: one place to see and allow everything the app needs to
@@ -473,6 +551,11 @@ const Push={
   }
 };
 Object.assign(A,{perms(){Perms.sheet()}});
+Object.assign(A,{
+  async bkupnow(){if(!C().hasPw)return toast("Add a password first to turn on cloud backup");if(!C().token)return toast("Log in first");toast("Backing up…");const ok=await Backup.upload(true);toast(ok?"Backup saved to the cloud":"Couldn’t back up — check the debug log");render()},
+  bkrestore(){if(!C().token)return toast("Log in first");const hasLocal=S.chats.some(c=>c.id!=="Note to Self"&&c.msgs.length);if(hasLocal)sheet("Restore from backup?",[["Replace my chats with the backup",async()=>{await Backup.restore(true)}]],'<p class="hint">This replaces the chats on this phone with the cloud backup. Messages sent after the backup was made will be lost from this phone.</p>');else Backup.restore(true)},
+  bkdel(){sheet("Delete the cloud backup?",[["Delete backup",async()=>{await Backup.remove()}]],'<p class="hint">Erases your encrypted backup from the server. Your chats stay on this phone.</p>')}
+});
 setTimeout(()=>{try{if(C().token)askPerms()}catch(e){}},2000);
 setTimeout(()=>{try{Push.register()}catch(e){}},3000);
 /* Persistent debug log: every important event (polls, visibility, network,

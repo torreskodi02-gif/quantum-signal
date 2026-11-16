@@ -23,13 +23,14 @@ export default{
 
 export class Hub{
   constructor(state,env){
-    this.sql=state.storage.sql;this.waiters=new Map();this.hits=new Map();this.regs=new Map();this.logins=new Map();this.fails=new Map();
+    this.sql=state.storage.sql;this.waiters=new Map();this.hits=new Map();this.regs=new Map();this.logins=new Map();this.fails=new Map();this.backs=new Map();
     state.blockConcurrencyWhile(async()=>{
       this.run('CREATE TABLE IF NOT EXISTS users(name TEXT PRIMARY KEY,pub TEXT NOT NULL,th TEXT NOT NULL,at INTEGER NOT NULL,ah TEXT,vault TEXT)');
       for(const c of['ah TEXT','vault TEXT']){try{this.run('ALTER TABLE users ADD COLUMN '+c)}catch(e){}}   // older databases
       this.run('CREATE TABLE IF NOT EXISTS tokens(th TEXT PRIMARY KEY,user TEXT NOT NULL,at INTEGER NOT NULL)');
       this.run('CREATE INDEX IF NOT EXISTS tokens_user ON tokens(user,at)');
       this.run('CREATE TABLE IF NOT EXISTS box(id TEXT PRIMARY KEY,to_user TEXT NOT NULL,from_user TEXT NOT NULL,ct TEXT NOT NULL,iv TEXT NOT NULL,ts INTEGER NOT NULL)');
+      this.run('CREATE TABLE IF NOT EXISTS backups(user TEXT PRIMARY KEY,data TEXT NOT NULL,iv TEXT NOT NULL,ts INTEGER NOT NULL)');
       this.run('CREATE INDEX IF NOT EXISTS box_to ON box(to_user,ts)');
     });
   }
@@ -50,8 +51,8 @@ export class Hub{
     try{
       const url=new URL(req.url),p=url.pathname,ip=req.headers.get('cf-connecting-ip')||'?',t=req.headers.get('x-token');
       if(this.limited(this.hits,ip,300,6e4))throw new HttpErr(429,'slow down');
-      const raw=req.method==='POST'?await req.text():'';
-      if(raw.length>65536)throw new HttpErr(413,'too large');
+      const raw=(req.method==='POST'||req.method==='DELETE')?await req.text():'';
+      if(raw.length>(p==='/backup'?6*1024*1024:65536))throw new HttpErr(413,'too large');
 
       if(p==='/health')return reply({ok:true,users:this.run('SELECT COUNT(*) AS c FROM users')[0].c,id:url.origin,peers:0,peersUp:0});
       if(p==='/servers')return reply({all:[url.origin]});
@@ -153,6 +154,30 @@ export class Hub{
           m=take();
         }
         return reply({m});
+      }
+
+      if(p==='/backup'&&req.method==='POST'){
+        const{u,iv,data}=parse(raw);
+        await this.auth(u,t);
+        if(!str(iv,64)||!str(data,5*1024*1024))throw new HttpErr(400,'bad backup');
+        if(this.limited(this.backs,u,1,6e4))throw new HttpErr(429,'slow down');
+        this.run('INSERT OR REPLACE INTO backups(user,data,iv,ts) VALUES(?,?,?,?)',u,data,iv,Date.now());
+        return reply({ok:true});
+      }
+
+      if(p==='/backup'&&req.method==='GET'){
+        const u=url.searchParams.get('u');
+        await this.auth(u,t);
+        const r=this.run('SELECT data,iv,ts FROM backups WHERE user=?',u)[0];
+        if(!r)throw new HttpErr(404,'not found');
+        return reply({data:r.data,iv:r.iv,ts:r.ts});
+      }
+
+      if(p==='/backup'&&req.method==='DELETE'){
+        const u=parse(raw).u;
+        await this.auth(u,t);
+        this.run('DELETE FROM backups WHERE user=?',u);
+        return reply({ok:true});
       }
 
       throw new HttpErr(404,'not found');
