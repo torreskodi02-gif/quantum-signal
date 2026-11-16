@@ -33,6 +33,8 @@ export class Hub{
       this.run('CREATE TABLE IF NOT EXISTS box(id TEXT PRIMARY KEY,to_user TEXT NOT NULL,from_user TEXT NOT NULL,ct TEXT NOT NULL,iv TEXT NOT NULL,ts INTEGER NOT NULL)');
       this.run('CREATE TABLE IF NOT EXISTS backups(user TEXT PRIMARY KEY,data TEXT NOT NULL,iv TEXT NOT NULL,ts INTEGER NOT NULL)');
       this.run('CREATE TABLE IF NOT EXISTS push_tokens(user TEXT NOT NULL,token TEXT NOT NULL,updated INTEGER NOT NULL,PRIMARY KEY(user,token))');
+      this.run('CREATE TABLE IF NOT EXISTS security(user TEXT PRIMARY KEY,q1 TEXT NOT NULL,q2 TEXT NOT NULL,a1 TEXT NOT NULL,a2 TEXT NOT NULL,rec_iv TEXT NOT NULL,rec_ct TEXT NOT NULL)');
+      this.run('CREATE TABLE IF NOT EXISTS resets(th TEXT PRIMARY KEY,user TEXT NOT NULL,exp INTEGER NOT NULL)');
       this.run('CREATE INDEX IF NOT EXISTS box_to ON box(to_user,ts)');
     });
   }
@@ -236,6 +238,70 @@ export class Hub{
         await this.auth(u,t);
         this.run('DELETE FROM backups WHERE user=?',u);
         return reply({ok:true});
+      }
+
+
+      if(p==='/security-questions'&&req.method==='POST'){
+        const{u,q1,q2,a1,a2,rec_iv,rec_ct}=parse(raw);
+        await this.auth(u,t);
+        if(!str(q1,200)||!str(q2,200)||!HEX64.test(a1||'')||!HEX64.test(a2||'')||!str(rec_iv,64)||!str(rec_ct,8192))throw new HttpErr(400,'bad security questions');
+        this.run('INSERT OR REPLACE INTO security(user,q1,q2,a1,a2,rec_iv,rec_ct) VALUES(?,?,?,?,?,?,?)',u,q1,q2,a1,a2,rec_iv,rec_ct);
+        return reply({ok:true});
+      }
+
+      if(p==='/security-questions'&&req.method==='GET'){
+        const u=url.searchParams.get('u');
+        if(typeof u!=='string'||!NAME.test(u))throw new HttpErr(400,'bad username');
+        const r=this.run('SELECT q1,q2 FROM security WHERE user=?',u)[0];
+        if(!r)throw new HttpErr(404,'not found');
+        return reply({q1:r.q1,q2:r.q2});
+      }
+
+      if(p==='/forgot-password'&&req.method==='POST'){
+        const{u,a1,a2}=parse(raw);
+        if(typeof u!=='string'||!NAME.test(u)||!HEX64.test(a1||'')||!HEX64.test(a2||''))throw new HttpErr(400,'bad request');
+        const f=this.failed(u);if(f.n>=5)throw new HttpErr(429,'too many attempts');
+        if(this.limited(this.logins,ip,5,9e5))throw new HttpErr(429,'too many attempts');
+        const r=this.run('SELECT a1,a2,rec_iv,rec_ct FROM security WHERE user=?',u)[0];
+        if(!r||!this.user(u)){this.bad(u,f);throw new HttpErr(404,'not found')}
+        if(!same(a1,r.a1)||!same(a2,r.a2)){this.bad(u,f);throw new HttpErr(401,'wrong answers')}
+        this.fails.delete(u);
+        const tok=rand();
+        this.run('INSERT INTO resets(th,user,exp) VALUES(?,?,?)',await hex(tok),u,Date.now()+15*60*1000);
+        this.run('DELETE FROM resets WHERE exp<?',Date.now());
+        return reply({ok:true,rec_iv:r.rec_iv,rec_ct:r.rec_ct,reset_token:tok});
+      }
+
+      if(p==='/reset-password'&&req.method==='POST'){
+        const{u,reset_token,auth,vault}=parse(raw);
+        if(typeof u!=='string'||!HEX64.test(reset_token||'')||!HEX64.test(auth||'')||!vaultOk(vault))throw new HttpErr(400,'bad reset');
+        const row=this.run('SELECT user,exp FROM resets WHERE th=?',await hex(reset_token))[0];
+        if(!row||row.user!==u||Date.now()>row.exp)throw new HttpErr(401,'bad or expired reset token');
+        this.run('DELETE FROM resets WHERE th=?',await hex(reset_token));
+        const r=this.user(u);if(!r)throw new HttpErr(404,'not found');
+        this.run('UPDATE users SET ah=?,vault=? WHERE name=?',await hex(auth),JSON.stringify(vault),u);
+        // Log the user in with a fresh token (and clear any lockout).
+        this.fails.delete(u);
+        const tok=rand();
+        this.run('INSERT INTO tokens(th,user,at) VALUES(?,?,?)',await hex(tok),u,Date.now());
+        return reply({ok:true,token:tok,pub:JSON.parse(r.pub),vault:JSON.parse(JSON.stringify(vault))});
+      }
+
+      if(p==='/admin/prune'&&req.method==='POST'){
+        const{keep,key}=parse(raw);
+        const adminKey=this.env&&this.env.ADMIN_KEY;
+        if(!adminKey||typeof key!=='string'||!same(key,adminKey))throw new HttpErr(403,'admin only');
+        if(typeof keep!=='string'||!NAME.test(keep))throw new HttpErr(400,'bad keep user');
+        if(!this.user(keep))throw new HttpErr(404,'keep user not found');
+        const n=this.run('SELECT COUNT(*) AS c FROM users WHERE name!=?',keep)[0].c;
+        this.run('DELETE FROM users WHERE name!=?',keep);
+        this.run('DELETE FROM tokens WHERE user!=?',keep);
+        this.run('DELETE FROM box WHERE to_user!=? AND from_user!=?',keep,keep);
+        this.run('DELETE FROM backups WHERE user!=?',keep);
+        this.run('DELETE FROM push_tokens WHERE user!=?',keep);
+        this.run('DELETE FROM security WHERE user!=?',keep);
+        this.run('DELETE FROM resets WHERE user!=?',keep);
+        return reply({ok:true,removed:n,kept:keep});
       }
 
       throw new HttpErr(404,'not found');
